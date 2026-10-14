@@ -1,0 +1,30 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.env
+
+# Flask / Instance folder
+instance/
+
+# Storage files (uploads, reports, logs) except structure
+storage/uploads/*
+storage/evidence/*
+storage/reports/*
+storage/logs/*
+!storage/uploads/.gitkeep
+!storage/evidence/.gitkeep
+!storage/reports/.gitkeep
+!storage/logs/.gitkeep
+
+# IDE / OS files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db

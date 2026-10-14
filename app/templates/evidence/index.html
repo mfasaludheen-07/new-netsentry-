@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Evidence Vault | NetSentry SOC{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-soc-surface border border-soc-border p-4 rounded-xl">
+        <div>
+            <h1 class="text-lg font-bold text-white flex items-center space-x-2">
+                <i class="fa-solid fa-box-archive text-yellow-400"></i>
+                <span>Cryptographic Evidence Vault</span>
+            </h1>
+            <p class="text-xs text-slate-400">Chain of custody preservation, SHA-256 verification, and forensic telemetry repository.</p>
+        </div>
+    </div>
+
+    <!-- Evidence Table -->
+    <div class="bg-soc-surface border border-soc-border rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+            <span>Preserved Artifacts ({{ evidence_pagination.total }})</span>
+            <span class="text-slate-500 font-mono text-[11px]">Strict Non-Execution Storage</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="text-[10px] uppercase text-slate-400 bg-slate-900/80 border-b border-slate-800">
+                    <tr>
+                        <th class="py-2.5 px-3">Artifact Filename</th>
+                        <th class="py-2.5 px-3">Associated Case</th>
+                        <th class="py-2.5 px-3">File Size</th>
+                        <th class="py-2.5 px-3">Cryptographic SHA-256 Hash</th>
+                        <th class="py-2.5 px-3">Uploaded At</th>
+                        <th class="py-2.5 px-3 text-right">Integrity / Custody</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% for ev in evidence_pagination.items %}
+                    <tr class="hover:bg-slate-900/40">
+                        <td class="py-3 px-3">
+                            <div class="font-bold text-slate-200 flex items-center space-x-1.5">
+                                <i class="fa-solid fa-file-shield text-cyan-400 text-xs"></i>
+                                <span>{{ ev.original_filename }}</span>
+                            </div>
+                            {% if ev.description %}
+                            <div class="text-[10px] text-slate-400 truncate max-w-xs mt-0.5">{{ ev.description }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-3">
+                            <a href="{{ url_for('cases.view', case_id=ev.case_id, tab='evidence') }}" class="font-mono text-purple-400 hover:underline">
+                                {{ ev.case_id }}
+                            </a>
+                        </td>
+                        <td class="py-3 px-3 font-mono text-slate-300 text-[11px]">
+                            {{ ev.size|filesizeformat }}
+                        </td>
+                        <td class="py-3 px-3 font-mono text-[11px] text-cyan-400">
+                            {{ ev.hash_sha256 }}
+                        </td>
+                        <td class="py-3 px-3 font-mono text-[11px] text-slate-400">
+                            {{ ev.uploaded_at.strftime('%Y-%m-%d %H:%M') }}
+                        </td>
+                        <td class="py-3 px-3 text-right">
+                            <div class="flex items-center justify-end space-x-2">
+                                <form method="POST" action="{{ url_for('evidence.verify', evidence_id=ev.id) }}" class="inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] border border-slate-700" title="Verify SHA-256 integrity">
+                                        <i class="fa-solid fa-check-double text-emerald-400"></i>
+                                    </button>
+                                </form>
+                                <a href="{{ url_for('evidence.download', evidence_id=ev.id) }}" class="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-medium">
+                                    <i class="fa-solid fa-download mr-1"></i> Retrieve
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="py-8 text-center text-slate-500">No evidence items secured in vault yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if evidence_pagination.pages > 1 %}
+        <div class="p-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <div>Page {{ evidence_pagination.page }} of {{ evidence_pagination.pages }}</div>
+            <div class="flex space-x-1">
+                {% if evidence_pagination.has_prev %}
+                <a href="{{ url_for('evidence.index', page=evidence_pagination.prev_num) }}" class="px-2 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">Prev</a>
+                {% endif %}
+                {% if evidence_pagination.has_next %}
+                <a href="{{ url_for('evidence.index', page=evidence_pagination.next_num) }}" class="px-2 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">Next</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

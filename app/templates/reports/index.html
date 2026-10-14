@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Forensic Reports | NetSentry SOC{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-soc-surface border border-soc-border p-4 rounded-xl">
+        <div>
+            <h1 class="text-lg font-bold text-white flex items-center space-x-2">
+                <i class="fa-solid fa-file-invoice text-cyan-400"></i>
+                <span>Forensic Investigation Reports Catalog</span>
+            </h1>
+            <p class="text-xs text-slate-400">Formal 16-section security incident reports, executive summaries, and timeline archives.</p>
+        </div>
+    </div>
+
+    <!-- Reports Table -->
+    <div class="bg-soc-surface border border-soc-border rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+            <span>Generated Reports ({{ reports_pagination.total }})</span>
+            <span class="text-slate-500 font-mono text-[11px]">Printable HTML & PDF Ready</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="text-[10px] uppercase text-slate-400 bg-slate-900/80 border-b border-slate-800">
+                    <tr>
+                        <th class="py-2.5 px-3">Report Document Title</th>
+                        <th class="py-2.5 px-3">Associated Case</th>
+                        <th class="py-2.5 px-3">Lead Investigator</th>
+                        <th class="py-2.5 px-3">Compilation Date</th>
+                        <th class="py-2.5 px-3 text-right">View / Print</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% for rep in reports_pagination.items %}
+                    <tr class="hover:bg-slate-900/40">
+                        <td class="py-3 px-3">
+                            <a href="{{ url_for('reports.view', report_id=rep.id) }}" class="font-bold text-cyan-400 hover:underline">
+                                {{ rep.title }}
+                            </a>
+                            <div class="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{{ rep.summary or 'Full forensic incident report.' }}</div>
+                        </td>
+                        <td class="py-3 px-3">
+                            <a href="{{ url_for('cases.view', case_id=rep.case_id, tab='report') }}" class="font-mono text-purple-400 hover:underline">
+                                {{ rep.case_id }}
+                            </a>
+                        </td>
+                        <td class="py-3 px-3 text-slate-300 font-medium">
+                            {{ rep.generator.username if rep.generator else 'SOC Platform' }}
+                        </td>
+                        <td class="py-3 px-3 font-mono text-[11px] text-slate-400">
+                            {{ rep.generated_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                        </td>
+                        <td class="py-3 px-3 text-right">
+                            <div class="flex items-center justify-end space-x-2">
+                                <a href="{{ url_for('reports.view', report_id=rep.id) }}" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs">
+                                    Read Dossier
+                                </a>
+                                <a href="{{ url_for('reports.print_report', report_id=rep.id) }}" target="_blank" class="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-semibold">
+                                    <i class="fa-solid fa-print mr-1"></i> Print
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="py-8 text-center text-slate-500">No formal reports generated yet. Open a case and click "Compile New Report".</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if reports_pagination.pages > 1 %}
+        <div class="p-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <div>Page {{ reports_pagination.page }} of {{ reports_pagination.pages }}</div>
+            <div class="flex space-x-1">
+                {% if reports_pagination.has_prev %}
+                <a href="{{ url_for('reports.index', page=reports_pagination.prev_num) }}" class="px-2 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">Prev</a>
+                {% endif %}
+                {% if reports_pagination.has_next %}
+                <a href="{{ url_for('reports.index', page=reports_pagination.next_num) }}" class="px-2 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">Next</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

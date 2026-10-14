@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ report.title }} - Official Forensic Dossier</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            color: #111827;
+            background: #ffffff;
+            font-size: 11pt;
+            line-height: 1.5;
+            margin: 0;
+            padding: 20px;
+        }
+        .header {
+            border-bottom: 3px solid #0f172a;
+            padding-bottom: 12px;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 20pt;
+            color: #0f172a;
+            letter-spacing: -0.5px;
+        }
+        .header p {
+            margin: 4px 0 0 0;
+            color: #4b5563;
+            font-size: 9pt;
+        }
+        .badge {
+            background: #0f172a;
+            color: #ffffff;
+            font-size: 8pt;
+            font-weight: bold;
+            padding: 3px 8px;
+            border-radius: 3px;
+            text-transform: uppercase;
+        }
+        h2 {
+            font-size: 13pt;
+            color: #0f172a;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 5px;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9pt;
+            margin: 10px 0;
+        }
+        th, td {
+            border: 1px solid #d1d5db;
+            padding: 6px 8px;
+            text-align: left;
+        }
+        th {
+            background: #f3f4f6;
+            font-weight: bold;
+            color: #374151;
+        }
+        .code {
+            font-family: 'Courier New', monospace;
+            background: #f3f4f6;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 8.5pt;
+        }
+        .meta-box {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .meta-item {
+            font-size: 9pt;
+        }
+        .meta-item span {
+            display: block;
+            font-size: 7.5pt;
+            color: #6b7280;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        .print-btn {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            background: #0f172a;
+            color: #ffffff;
+            padding: 8px 16px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 10pt;
+            cursor: pointer;
+            border: none;
+        }
+        @media print {
+            .print-btn {
+                display: none;
+            }
+            body {
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="print-btn" onclick="window.print()">Print Report / Save as PDF</button>
+
+    <div class="header">
+        <div>
+            <h1>NetSentry Security Operations</h1>
+            <p>Official Network Threat Hunting & Forensic Attack Reconstruction Dossier</p>
+        </div>
+        <div style="text-align: right;">
+            <span class="badge">CONFIDENTIAL</span>
+            <p>Generated: {{ report.generated_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</p>
+        </div>
+    </div>
+
+    <!-- Case Metadata Box -->
+    <div class="meta-box">
+        <div class="meta-item">
+            <span>Case Identifier</span>
+            <strong class="code">{{ data.case.id if data.case else report.case_id }}</strong>
+        </div>
+        <div class="meta-item">
+            <span>Incident Severity</span>
+            <strong>{{ data.case.severity if data.case else 'HIGH' }}</strong>
+        </div>
+        <div class="meta-item">
+            <span>Lifecycle Status</span>
+            <strong>{{ data.case.status if data.case else 'INVESTIGATING' }}</strong>
+        </div>
+        <div class="meta-item">
+            <span>Lead Investigator</span>
+            <strong>{{ data.case.assigned_to if data.case else 'SOC Team' }}</strong>
+        </div>
+    </div>
+
+    <h2>1. Executive Summary & Incident Scope</h2>
+    <p>{{ data.case.description if data.case and data.case.description else report.summary }}</p>
+
+    <h2>2. Primary Threat Detections & Alerts</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Alert ID</th>
+                <th>Severity</th>
+                <th>Title</th>
+                <th>Source IP</th>
+                <th>Target IP</th>
+                <th>Confidence</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if data.alerts %}
+            {% for a in data.alerts %}
+            <tr>
+                <td class="code">{{ a.id }}</td>
+                <td><strong>{{ a.severity }}</strong></td>
+                <td>{{ a.title }}</td>
+                <td class="code">{{ a.source_ip }}</td>
+                <td class="code">{{ a.destination_ip }}</td>
+                <td>{{ a.confidence }}</td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr><td colspan="6">No alerts associated with this case snapshot.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <h2>3. Profiled Internal Endpoints</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Hostname</th>
+                <th>Configured IP</th>
+                <th>Criticality</th>
+                <th>Operating System / Role</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if data.endpoints %}
+            {% for ep in data.endpoints %}
+            <tr>
+                <td><strong>{{ ep.hostname }}</strong></td>
+                <td class="code">{{ ep.ip_address }}</td>
+                <td>{{ ep.criticality }}</td>
+                <td>{{ ep.owner_description or ep.os_info }}</td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr><td colspan="4">No specific internal hosts mapped.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <h2>4. Key Indicators of Compromise (IOCs)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Indicator Value</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Confidence</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if data.iocs %}
+            {% for i in data.iocs %}
+            <tr>
+                <td class="code">{{ i.value }}</td>
+                <td>{{ i.type }}</td>
+                <td><strong>{{ i.status }}</strong></td>
+                <td>{{ i.confidence }}</td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr><td colspan="4">No IOCs recorded.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <h2>5. Attack Path Progression Stages</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Stage #</th>
+                <th>Stage Description</th>
+                <th>Status</th>
+                <th>Evidence Summary</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if data.attack_stages %}
+            {% for s in data.attack_stages %}
+            <tr>
+                <td>{{ s.order }}</td>
+                <td><strong>{{ s.name }}</strong></td>
+                <td>{{ s.status }}</td>
+                <td>{{ s.evidence_summary }}</td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr><td colspan="4">No attack path stages logged.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <h2>6. Forensic Evidence & Cryptographic Hashes</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Artifact Filename</th>
+                <th>Size</th>
+                <th>Cryptographic SHA-256 Hash</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if data.evidence %}
+            {% for ev in data.evidence %}
+            <tr>
+                <td><strong>{{ ev.filename }}</strong></td>
+                <td>{{ ev.size|filesizeformat }}</td>
+                <td class="code" style="font-size: 7.5pt;">{{ ev.hash_sha256 }}</td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr><td colspan="3">No evidence items recorded.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <h2>7. Remediation & Hardening Actions</h2>
+    <ol>
+        <li>Isolate internal host PC-07 to quarantine VLAN immediately.</li>
+        <li>Block outbound ingress/egress to external C2 address 203.0.113.20.</li>
+        <li>Revoke credentials for Alice Mitchell account (alice.m) and force password reset.</li>
+        <li>Conduct forensic disk triage on core database SERVER-01 (10.0.0.5) to check for SMB payload execution.</li>
+    </ol>
+
+    <div style="margin-top: 40px; padding-top: 15px; border-top: 1px solid #d1d5db; font-size: 8.5pt; color: #6b7280; text-align: center;">
+        End of NetSentry Forensic Incident Report &bull; Compiled via NetSentry SOC Platform
+    </div>
+</body>
+</html>

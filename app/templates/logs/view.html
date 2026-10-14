@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Upload #{{ upload.id }} Telemetry | NetSentry SOC{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-soc-surface border border-soc-border p-4 rounded-xl">
+        <div>
+            <div class="flex items-center space-x-2">
+                <a href="{{ url_for('logs.index') }}" class="text-xs text-slate-400 hover:text-cyan-400">&larr; Ingestion List</a>
+                <span class="text-slate-600">&bull;</span>
+                <span class="text-xs text-slate-400 font-mono">Upload #{{ upload.id }}</span>
+            </div>
+            <h1 class="text-lg font-bold text-white mt-1">{{ upload.original_filename }}</h1>
+            <div class="text-[11px] text-slate-400 font-mono mt-0.5">SHA-256: {{ upload.hash_sha256 }}</div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <span class="px-2.5 py-1 rounded text-xs font-bold uppercase
+                {% if upload.status == 'COMPLETED' %}bg-emerald-950 text-emerald-400 border border-emerald-800
+                {% elif upload.status == 'PROCESSING' %}bg-amber-950 text-amber-400 border border-amber-800
+                {% else %}bg-rose-950 text-rose-400 border border-rose-800{% endif %}">
+                {{ upload.status }}
+            </span>
+            <a href="{{ url_for('logs.traffic') }}" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded text-xs font-medium transition-colors">
+                <i class="fa-solid fa-network-wired mr-1 text-cyan-400"></i> Traffic Explorer
+            </a>
+        </div>
+    </div>
+
+    <!-- Upload Summary Metrics -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="bg-soc-surface border border-soc-border p-3.5 rounded-xl">
+            <span class="text-xs text-slate-400">Imported Rows</span>
+            <div class="text-xl font-bold text-emerald-400 font-mono">{{ upload.imported_rows }}</div>
+        </div>
+        <div class="bg-soc-surface border border-soc-border p-3.5 rounded-xl">
+            <span class="text-xs text-slate-400">Skipped Empty</span>
+            <div class="text-xl font-bold text-slate-300 font-mono">{{ upload.skipped_rows }}</div>
+        </div>
+        <div class="bg-soc-surface border border-soc-border p-3.5 rounded-xl">
+            <span class="text-xs text-slate-400">Invalid Records</span>
+            <div class="text-xl font-bold text-rose-400 font-mono">{{ upload.error_count }}</div>
+        </div>
+        <div class="bg-soc-surface border border-soc-border p-3.5 rounded-xl">
+            <span class="text-xs text-slate-400">Stored Payload</span>
+            <div class="text-xl font-bold text-cyan-400 font-mono">{{ upload.file_size|filesizeformat }}</div>
+        </div>
+    </div>
+
+    <!-- Parsed Network Events Table -->
+    <div class="bg-soc-surface border border-soc-border rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+            <span>Normalized Network Events ({{ events_pagination.total }})</span>
+            <span class="text-slate-500 font-mono text-[11px]">Source: {{ upload.source.name if upload.source else 'Generic' }}</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="text-[10px] uppercase text-slate-400 bg-slate-900/80 border-b border-slate-800">
+                    <tr>
+                        <th class="py-2.5 px-3">Timestamp</th>
+                        <th class="py-2.5 px-3">Source & Host</th>
+                        <th class="py-2.5 px-3">Destination IP & Port</th>
+                        <th class="py-2.5 px-3">Protocol</th>
+                        <th class="py-2.5 px-3">Type</th>
+                        <th class="py-2.5 px-3">Action</th>
+                        <th class="py-2.5 px-3 text-right">Details</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% for ev in events_pagination.items %}
+                    <tr class="hover:bg-slate-900/40">
+                        <td class="py-2.5 px-3 font-mono text-[11px] text-slate-300 whitespace-nowrap">
+                            {{ ev.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}
+                        </td>
+                        <td class="py-2.5 px-3">
+                            <span class="font-mono text-cyan-300 font-medium">{{ ev.source_ip }}</span>
+                            {% if ev.source_port %}<span class="text-slate-500 font-mono">:{{ ev.source_port }}</span>{% endif %}
+                            {% if ev.hostname %}
+                            <div class="text-[10px] text-slate-400"><i class="fa-solid fa-desktop text-[9px] mr-1"></i>{{ ev.hostname }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3">
+                            <span class="font-mono text-slate-200 font-medium">{{ ev.destination_ip }}</span>
+                            {% if ev.destination_port %}<span class="text-amber-300 font-mono">:{{ ev.destination_port }}</span>{% endif %}
+                            {% if ev.domain %}
+                            <div class="text-[10px] text-amber-400/90 truncate max-w-xs"><i class="fa-solid fa-link text-[9px] mr-1"></i>{{ ev.domain }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3">
+                            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-300">
+                                {{ ev.protocol }}
+                            </span>
+                        </td>
+                        <td class="py-2.5 px-3 text-slate-300 capitalize">
+                            {{ ev.event_type }}
+                        </td>
+                        <td class="py-2.5 px-3">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase
+                                {% if ev.action == 'ALLOW' %}bg-emerald-950 text-emerald-400 border border-emerald-800
+                                {% else %}bg-rose-950 text-rose-400 border border-rose-800{% endif %}">
+                                {{ ev.action }}
+                            </span>
+                        </td>
+                        <td class="py-2.5 px-3 text-right">
+                            <a href="{{ url_for('logs.traffic_detail', event_id=ev.id) }}" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] transition-colors">
+                                Raw
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="py-6 text-center text-slate-500">No events found in this upload.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if events_pagination.pages > 1 %}
+        <div class="p-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <div>Page {{ events_pagination.page }} of {{ events_pagination.pages }}</div>
+            <div class="flex space-x-1">
+                {% if events_pagination.has_prev %}
+                <a href="{{ url_for('logs.view_upload', upload_id=upload.id, page=events_pagination.prev_num) }}" class="px-2 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">Prev</a>
+                {% endif %}
+                {% if events_pagination.has_next %}
+                <a href="{{ url_for('logs.view_upload', upload_id=upload.id, page=events_pagination.next_num) }}" class="px-2 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">Next</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

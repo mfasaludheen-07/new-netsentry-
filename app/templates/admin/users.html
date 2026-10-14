@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}User Management | NetSentry SOC{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-soc-surface border border-soc-border p-4 rounded-xl">
+        <div>
+            <h1 class="text-lg font-bold text-white flex items-center space-x-2">
+                <i class="fa-solid fa-users text-cyan-400"></i>
+                <span>SOC Identity & User Management</span>
+            </h1>
+            <p class="text-xs text-slate-400">Manage administrator, analyst, and read-only observer accounts with role-based access control.</p>
+        </div>
+        <button onclick="document.getElementById('newUserModal').classList.toggle('hidden')" class="px-3.5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md transition-all flex items-center space-x-1.5">
+            <i class="fa-solid fa-user-plus"></i>
+            <span>Create New User Account</span>
+        </button>
+    </div>
+
+    <!-- Users Table -->
+    <div class="bg-soc-surface border border-soc-border rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider">
+            Registered SOC Accounts ({{ users|length }})
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="text-[10px] uppercase text-slate-400 bg-slate-900/80 border-b border-slate-800">
+                    <tr>
+                        <th class="py-2.5 px-3">ID</th>
+                        <th class="py-2.5 px-3">Username</th>
+                        <th class="py-2.5 px-3">Email Address</th>
+                        <th class="py-2.5 px-3">Assigned Role</th>
+                        <th class="py-2.5 px-3">Account Status</th>
+                        <th class="py-2.5 px-3">Created At</th>
+                        <th class="py-2.5 px-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% for u in users %}
+                    <tr class="hover:bg-slate-900/40">
+                        <td class="py-3 px-3 font-mono text-slate-500">#{{ u.id }}</td>
+                        <td class="py-3 px-3 font-bold text-slate-200">
+                            {{ u.username }}
+                            {% if u.id == current_user.id %}<span class="text-[10px] text-cyan-400 font-normal ml-1">(You)</span>{% endif %}
+                        </td>
+                        <td class="py-3 px-3 text-slate-400 font-mono text-[11px]">{{ u.email }}</td>
+                        <td class="py-3 px-3">
+                            <form method="POST" action="{{ url_for('admin.users') }}" class="inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="action" value="change_role">
+                                <input type="hidden" name="user_id" value="{{ u.id }}">
+                                <select name="role_id" onchange="this.form.submit()" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-900 border border-slate-700 text-slate-200">
+                                    {% for r in roles %}
+                                    <option value="{{ r.id }}" {% if u.role_id == r.id %}selected{% endif %}>{{ r.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </form>
+                        </td>
+                        <td class="py-3 px-3">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {% if u.status == 'active' %}bg-emerald-950 text-emerald-400 border border-emerald-800{% else %}bg-rose-950 text-rose-400 border border-rose-800{% endif %}">
+                                {{ u.status }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-3 font-mono text-[11px] text-slate-400">
+                            {{ u.created_at.strftime('%Y-%m-%d') if u.created_at else 'N/A' }}
+                        </td>
+                        <td class="py-3 px-3 text-right">
+                            {% if u.id != current_user.id %}
+                            <form method="POST" action="{{ url_for('admin.users') }}" class="inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="action" value="toggle_status">
+                                <input type="hidden" name="user_id" value="{{ u.id }}">
+                                <button type="submit" class="px-2.5 py-1 rounded text-xs transition-colors {% if u.status == 'active' %}bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800{% else %}bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-800{% endif %}">
+                                    {{ 'Disable' if u.status == 'active' else 'Enable' }}
+                                </button>
+                            </form>
+                            {% else %}
+                            <span class="text-slate-600 text-xs italic">Current Session</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: New User -->
+<div id="newUserModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-soc-surface border border-soc-border max-w-md w-full rounded-xl p-5 shadow-2xl">
+        <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+            <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                <i class="fa-solid fa-user-plus text-purple-400"></i>
+                <span>Add Analyst / Admin Account</span>
+            </h3>
+            <button onclick="document.getElementById('newUserModal').classList.add('hidden')" class="text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form method="POST" action="{{ url_for('admin.users') }}" class="space-y-3 text-xs">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="create">
+
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Username *</label>
+                <input type="text" name="username" required placeholder="analyst_smith" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Email Address *</label>
+                <input type="email" name="email" required placeholder="smith@netsentry.local" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Password *</label>
+                <input type="password" name="password" required placeholder="••••••••••••" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Assigned Role</label>
+                <select name="role_id" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                    {% for r in roles %}
+                    <option value="{{ r.id }}" {% if r.name == 'ANALYST' %}selected{% endif %}>{{ r.name }} - {{ r.description }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex items-center justify-end space-x-2 pt-2">
+                <button type="button" onclick="document.getElementById('newUserModal').classList.add('hidden')" class="px-3 py-1.5 text-slate-400 hover:text-white">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-colors">
+                    Create User
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

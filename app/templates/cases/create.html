@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Open Case | NetSentry SOC{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+    <div class="bg-soc-surface border border-soc-border p-5 rounded-xl shadow-md">
+        <div class="flex items-center space-x-3 mb-5 border-b border-slate-800 pb-4">
+            <div class="w-10 h-10 rounded-lg bg-purple-950 border border-purple-800 text-purple-400 flex items-center justify-center text-lg">
+                <i class="fa-solid fa-folder-plus"></i>
+            </div>
+            <div>
+                <h1 class="text-base font-bold text-white">Open Incident Investigation Case</h1>
+                <p class="text-xs text-slate-400">Generates sequential tracking ID NET-YYYY-XXXXXX for forensic chain of custody.</p>
+            </div>
+        </div>
+
+        <form method="POST" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1.5" for="title">
+                    Investigation Title / Incident Name *
+                </label>
+                <input type="text" id="title" name="title" required placeholder="e.g., Suspected Lateral Movement and Data Staging from PC-07" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1.5" for="description">
+                    Executive Threat Narrative / Incident Summary
+                </label>
+                <textarea id="description" name="description" rows="3" placeholder="Document initial discovery rationale, triggering alert telemetry, affected systems..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-purple-500"></textarea>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1.5" for="severity">Severity</label>
+                    <select id="severity" name="severity" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+                        <option value="CRITICAL">CRITICAL</option>
+                        <option value="HIGH" selected>HIGH</option>
+                        <option value="MEDIUM">MEDIUM</option>
+                        <option value="LOW">LOW</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1.5" for="priority">Priority</label>
+                    <select id="priority" name="priority" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+                        <option value="URGENT">URGENT</option>
+                        <option value="HIGH" selected>HIGH</option>
+                        <option value="MEDIUM">MEDIUM</option>
+                        <option value="LOW">LOW</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1.5" for="assigned_to">Assignee</label>
+                    <select id="assigned_to" name="assigned_to" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+                        {% for user in analysts %}
+                        <option value="{{ user.id }}" {% if user.id == current_user.id %}selected{% endif %}>
+                            {{ user.username }} ({{ user.role.name if user.role else 'ANALYST' }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+                <a href="{{ url_for('cases.index') }}" class="px-3.5 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors">
+                    Cancel
+                </a>
+                <button type="submit" class="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg text-xs font-semibold shadow-lg shadow-purple-900/30 transition-all flex items-center space-x-2">
+                    <i class="fa-solid fa-folder-plus"></i>
+                    <span>Initialize Investigation Dossier</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

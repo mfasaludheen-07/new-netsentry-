@@ -1,0 +1,428 @@
+{% extends "base.html" %}
+
+{% block title %}SOC Dashboard | NetSentry Threat Platform{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Top Action Banner -->
+    <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-soc-surface border border-soc-border p-4 rounded-xl shadow-md">
+        <div>
+            <h1 class="text-xl font-bold text-white flex items-center space-x-2.5">
+                <i class="fa-solid fa-radar text-cyan-400"></i>
+                <span>Threat Hunting & Defense Telemetry</span>
+            </h1>
+            <p class="text-xs text-slate-400 mt-0.5">Real-time network security monitoring, active attack paths, and forensic investigation center.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="{{ url_for('logs.upload') }}" class="px-3 py-2 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md shadow-cyan-600/20 transition-all flex items-center space-x-1.5">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <span>Ingest Log Telemetry</span>
+            </a>
+            <form method="POST" action="{{ url_for('alerts.run_detections') }}" class="inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5">
+                    <i class="fa-solid fa-play text-cyan-400"></i>
+                    <span>Run Detection Engine</span>
+                </button>
+            </form>
+            <a href="{{ url_for('cases.create') }}" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5">
+                <i class="fa-solid fa-plus text-purple-400"></i>
+                <span>Open New Case</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- 8 KPI Metric Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+        <!-- Total Events -->
+        <div class="bg-soc-surface border border-soc-border p-3.5 rounded-xl">
+            <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span>Total Events</span>
+                <i class="fa-solid fa-network-wired text-cyan-400"></i>
+            </div>
+            <div class="text-xl font-bold text-white font-mono">{{ total_events }}</div>
+            <div class="text-[10px] text-slate-500 mt-1">Normalized flows</div>
+        </div>
+
+        <!-- Today's Events -->
+        <div class="bg-soc-surface border border-soc-border p-3.5 rounded-xl">
+            <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span>Recent Events</span>
+                <i class="fa-solid fa-bolt text-indigo-400"></i>
+            </div>
+            <div class="text-xl font-bold text-white font-mono">{{ today_events }}</div>
+            <div class="text-[10px] text-slate-500 mt-1">Recent window</div>
+        </div>
+
+        <!-- Total Alerts -->
+        <div class="bg-soc-surface border border-soc-border p-3.5 rounded-xl">
+            <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span>Threat Alerts</span>
+                <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+            </div>
+            <div class="text-xl font-bold text-white font-mono">{{ total_alerts }}</div>
+            <div class="text-[10px] text-slate-500 mt-1">Defensive triggers</div>
+        </div>
+
+        <!-- Critical Alerts -->
+        <div class="bg-soc-surface border border-rose-900/40 p-3.5 rounded-xl bg-rose-950/10">
+            <div class="flex items-center justify-between text-rose-400 text-xs mb-1">
+                <span>Critical Alerts</span>
+                <i class="fa-solid fa-fire text-rose-500 animate-pulse"></i>
+            </div>
+            <div class="text-xl font-bold text-rose-400 font-mono">{{ critical_alerts }}</div>
+            <div class="text-[10px] text-rose-500/80 mt-1">High priority</div>
+        </div>
+
+        <!-- Open Cases -->
+        <div class="bg-soc-surface border border-soc-border p-3.5 rounded-xl">
+            <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span>Active Cases</span>
+                <i class="fa-solid fa-folder-open text-purple-400"></i>
+            </div>
+            <div class="text-xl font-bold text-white font-mono">{{ open_cases }}</div>
+            <div class="text-[10px] text-slate-500 mt-1">In progress</div>
+        </div>
+
+        <!-- Total IOCs -->
+        <div class="bg-soc-surface border border-soc-border p-3.5 rounded-xl">
+            <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span>Known IOCs</span>
+                <i class="fa-solid fa-fingerprint text-emerald-400"></i>
+            </div>
+            <div class="text-xl font-bold text-white font-mono">{{ total_iocs }}</div>
+            <div class="text-[10px] text-slate-500 mt-1">Observed entities</div>
+        </div>
+
+        <!-- Endpoints -->
+        <div class="bg-soc-surface border border-soc-border p-3.5 rounded-xl">
+            <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span>Endpoints</span>
+                <i class="fa-solid fa-desktop text-sky-400"></i>
+            </div>
+            <div class="text-xl font-bold text-white font-mono">{{ total_endpoints }}</div>
+            <div class="text-[10px] text-slate-500 mt-1">Monitored hosts</div>
+        </div>
+
+        <!-- Evidence -->
+        <div class="bg-soc-surface border border-soc-border p-3.5 rounded-xl">
+            <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span>Evidence Items</span>
+                <i class="fa-solid fa-box-archive text-yellow-400"></i>
+            </div>
+            <div class="text-xl font-bold text-white font-mono">{{ total_evidence }}</div>
+            <div class="text-[10px] text-slate-500 mt-1">Hashed artifacts</div>
+        </div>
+    </div>
+
+    <!-- Charts Row 1 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <!-- Severity Breakdown Chart -->
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center space-x-2">
+                    <i class="fa-solid fa-chart-pie text-cyan-400"></i>
+                    <span>Alerts by Severity</span>
+                </h3>
+                <span class="text-[10px] text-slate-500 font-mono">LIVE TELEMETRY</span>
+            </div>
+            <div class="relative h-56 flex items-center justify-center">
+                <canvas id="severityChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Protocol Distribution Chart -->
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center space-x-2">
+                    <i class="fa-solid fa-chart-column text-indigo-400"></i>
+                    <span>Protocol Distribution</span>
+                </h3>
+                <span class="text-[10px] text-slate-500 font-mono">TOP PROTOCOLS</span>
+            </div>
+            <div class="relative h-56 flex items-center justify-center">
+                <canvas id="protocolChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Case Status Chart -->
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center space-x-2">
+                    <i class="fa-solid fa-chart-donut text-purple-400"></i>
+                    <span>Investigation Status</span>
+                </h3>
+                <span class="text-[10px] text-slate-500 font-mono">CASE PIPELINE</span>
+            </div>
+            <div class="relative h-56 flex items-center justify-center">
+                <canvas id="caseChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row 2: Top Source IPs & Top Destination Ports -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center space-x-2">
+                    <i class="fa-solid fa-satellite-dish text-cyan-400"></i>
+                    <span>Top Originating IP Addresses</span>
+                </h3>
+                <a href="{{ url_for('logs.traffic') }}" class="text-[11px] text-cyan-400 hover:underline">View in Traffic Explorer &rarr;</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="text-[10px] uppercase text-slate-400 bg-slate-900/60 border-b border-slate-800">
+                        <tr>
+                            <th class="py-2 px-3">Source IP Address</th>
+                            <th class="py-2 px-3">Classification</th>
+                            <th class="py-2 px-3 text-right">Event Count</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+                        {% for ip, cnt in top_src_ips %}
+                        <tr class="hover:bg-slate-900/40">
+                            <td class="py-2 px-3 font-mono text-cyan-300 font-medium">{{ ip }}</td>
+                            <td class="py-2 px-3">
+                                {% if ip|is_private_ip %}
+                                <span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800">Private Subnet</span>
+                                {% else %}
+                                <span class="px-1.5 py-0.5 rounded text-[10px] bg-rose-950 text-rose-400 border border-rose-800">Public Internet</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3 text-right font-mono text-slate-200 font-semibold">{{ cnt }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="py-3 text-center text-slate-500">No events logged yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center space-x-2">
+                    <i class="fa-solid fa-bullseye text-rose-400"></i>
+                    <span>Target Destination Ports</span>
+                </h3>
+                <span class="text-[10px] text-slate-500 font-mono">PORT FREQUENCY</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="text-[10px] uppercase text-slate-400 bg-slate-900/60 border-b border-slate-800">
+                        <tr>
+                            <th class="py-2 px-3">Port</th>
+                            <th class="py-2 px-3">Standard Service</th>
+                            <th class="py-2 px-3 text-right">Connections</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+                        {% for port, cnt in top_ports %}
+                        <tr class="hover:bg-slate-900/40">
+                            <td class="py-2 px-3 font-mono text-amber-300 font-medium">{{ port }}</td>
+                            <td class="py-2 px-3 text-slate-300">
+                                {% if port == 22 %}SSH (Secure Shell)
+                                {% elif port == 53 %}DNS (Domain Name Service)
+                                {% elif port == 80 %}HTTP (Web)
+                                {% elif port == 443 %}HTTPS / TLS
+                                {% elif port == 445 %}SMB / CIFS (Windows RPC)
+                                {% elif port == 3389 %}RDP (Remote Desktop)
+                                {% else %}Custom Service (Port {{ port }}){% endif %}
+                            </td>
+                            <td class="py-2 px-3 text-right font-mono text-slate-200 font-semibold">{{ cnt }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="py-3 text-center text-slate-500">No port interactions recorded.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Alerts & Investigations Split -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <!-- Recent Alerts -->
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center space-x-2">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+                    <span>Latest Detection Alerts</span>
+                </h3>
+                <a href="{{ url_for('alerts.index') }}" class="text-[11px] text-cyan-400 hover:underline">View All Alerts &rarr;</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="text-[10px] uppercase text-slate-400 bg-slate-900/60 border-b border-slate-800">
+                        <tr>
+                            <th class="py-2 px-3">ID / Severity</th>
+                            <th class="py-2 px-3">Detection Title</th>
+                            <th class="py-2 px-3">Source & Target</th>
+                            <th class="py-2 px-3 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+                        {% for a in recent_alerts %}
+                        <tr class="hover:bg-slate-900/40">
+                            <td class="py-2.5 px-3">
+                                <div class="font-mono text-slate-300 font-bold">{{ a.id }}</div>
+                                <span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase
+                                    {% if a.severity == 'CRITICAL' %}bg-rose-950 text-rose-400 border border-rose-800
+                                    {% elif a.severity == 'HIGH' %}bg-orange-950 text-orange-400 border border-orange-800
+                                    {% elif a.severity == 'MEDIUM' %}bg-amber-950 text-amber-400 border border-amber-800
+                                    {% else %}bg-slate-800 text-slate-400{% endif %}">
+                                    {{ a.severity }}
+                                </span>
+                            </td>
+                            <td class="py-2.5 px-3">
+                                <div class="font-medium text-slate-200">{{ a.title }}</div>
+                                <div class="text-[10px] text-slate-500 font-mono">{{ a.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+                            </td>
+                            <td class="py-2.5 px-3 font-mono text-[11px]">
+                                <span class="text-cyan-400">{{ a.source_ip or a.endpoint }}</span> &rarr;
+                                <span class="text-slate-400">{{ a.destination_ip or 'Broadcast' }}</span>
+                            </td>
+                            <td class="py-2.5 px-3 text-right">
+                                <a href="{{ url_for('alerts.view', alert_id=a.id) }}" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[11px] font-medium border border-slate-700 transition-colors">
+                                    Triage
+                                </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="py-4 text-center text-slate-500">No active threat alerts triggered yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Recent Investigation Cases -->
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center space-x-2">
+                    <i class="fa-solid fa-folder-open text-purple-400"></i>
+                    <span>Recent Investigation Cases</span>
+                </h3>
+                <a href="{{ url_for('cases.index') }}" class="text-[11px] text-cyan-400 hover:underline">View All Cases &rarr;</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="text-[10px] uppercase text-slate-400 bg-slate-900/60 border-b border-slate-800">
+                        <tr>
+                            <th class="py-2 px-3">Case ID</th>
+                            <th class="py-2 px-3">Incident Title</th>
+                            <th class="py-2 px-3">Status</th>
+                            <th class="py-2 px-3 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+                        {% for c in recent_cases %}
+                        <tr class="hover:bg-slate-900/40">
+                            <td class="py-2.5 px-3">
+                                <span class="font-mono text-purple-300 font-bold">{{ c.id }}</span>
+                                <div class="text-[10px] text-slate-500 font-mono">{{ c.created_at.strftime('%Y-%m-%d') }}</div>
+                            </td>
+                            <td class="py-2.5 px-3">
+                                <div class="font-medium text-slate-200 truncate max-w-xs">{{ c.title }}</div>
+                                <span class="text-[10px] text-slate-400">Severity: <span class="font-semibold text-slate-300">{{ c.severity }}</span></span>
+                            </td>
+                            <td class="py-2.5 px-3">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase
+                                    {% if c.status == 'OPEN' %}bg-rose-950 text-rose-400 border border-rose-800
+                                    {% elif c.status == 'INVESTIGATING' %}bg-amber-950 text-amber-400 border border-amber-800
+                                    {% elif c.status == 'RESOLVED' %}bg-emerald-950 text-emerald-400 border border-emerald-800
+                                    {% else %}bg-slate-800 text-slate-400 border border-slate-700{% endif %}">
+                                    {{ c.status }}
+                                </span>
+                            </td>
+                            <td class="py-2.5 px-3 text-right">
+                                <a href="{{ url_for('cases.view', case_id=c.id) }}" class="px-2 py-1 bg-purple-950/60 hover:bg-purple-900 text-purple-300 rounded text-[11px] font-medium border border-purple-800 transition-colors">
+                                    Inspect
+                                </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="py-4 text-center text-slate-500">No open investigation cases.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // 1. Severity Chart
+    const severityData = {{ chart_severity|tojson }};
+    new Chart(document.getElementById('severityChart'), {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(severityData),
+            datasets: [{
+                data: Object.values(severityData),
+                backgroundColor: ['#ef4444', '#f97316', '#f59e0b', '#3b82f6'],
+                borderColor: '#0f172a',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { color: '#94a3b8', boxWidth: 12, font: { size: 10 } } }
+            }
+        }
+    });
+
+    // 2. Protocol Chart
+    const protoData = {{ chart_protocols|tojson }};
+    new Chart(document.getElementById('protocolChart'), {
+        type: 'bar',
+        data: {
+            labels: Object.keys(protoData),
+            datasets: [{
+                label: 'Events',
+                data: Object.values(protoData),
+                backgroundColor: '#6366f1',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } },
+                y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#1e293b' } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    // 3. Case Status Chart
+    const caseData = {{ chart_case_statuses|tojson }};
+    new Chart(document.getElementById('caseChart'), {
+        type: 'pie',
+        data: {
+            labels: Object.keys(caseData),
+            datasets: [{
+                data: Object.values(caseData),
+                backgroundColor: ['#f43f5e', '#f59e0b', '#8b5cf6', '#10b981', '#64748b'],
+                borderColor: '#0f172a',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { color: '#94a3b8', boxWidth: 12, font: { size: 10 } } }
+            }
+        }
+    });
+</script>
+{% endblock %}

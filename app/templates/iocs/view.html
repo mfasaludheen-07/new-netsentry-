@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}IOC: {{ ioc.value }} | NetSentry SOC{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-soc-surface border border-soc-border p-4 rounded-xl">
+        <div>
+            <div class="flex items-center space-x-2">
+                <a href="{{ url_for('iocs.index') }}" class="text-xs text-slate-400 hover:text-cyan-400">&larr; IOC Vault</a>
+                <span class="text-slate-600">&bull;</span>
+                <span class="text-xs font-mono text-emerald-400">{{ ioc.type }}</span>
+            </div>
+            <h1 class="text-lg font-bold text-white font-mono mt-1">{{ ioc.value }}</h1>
+            {% if classification %}
+            <div class="text-[11px] text-slate-400 mt-0.5">
+                <i class="fa-solid fa-network-wired text-cyan-400 mr-1"></i> RFC Classification: <span class="font-semibold text-slate-200">{{ classification }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <span class="px-2.5 py-1 rounded text-xs font-bold uppercase
+                {% if ioc.status == 'CONFIRMED' %}bg-rose-950 text-rose-400 border border-rose-800
+                {% elif ioc.status == 'SUSPICIOUS' %}bg-amber-950 text-amber-400 border border-amber-800
+                {% elif ioc.status == 'BENIGN' %}bg-emerald-950 text-emerald-400 border border-emerald-800
+                {% else %}bg-slate-800 text-slate-400 border border-slate-700{% endif %}">
+                STATUS: {{ ioc.status }}
+            </span>
+            <span class="px-2.5 py-1 bg-slate-900 text-slate-300 border border-slate-700 rounded text-xs font-semibold">
+                {{ ioc.confidence }} CONFIDENCE
+            </span>
+        </div>
+    </div>
+
+    <!-- Triage Form & Metadata -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3">Triage & Confidence Rating</h3>
+            <form method="POST" action="{{ url_for('iocs.update_status', ioc_id=ioc.id) }}" class="space-y-3 text-xs">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Investigation Verdict</label>
+                    <select name="status" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                        <option value="OBSERVED" {% if ioc.status == 'OBSERVED' %}selected{% endif %}>OBSERVED</option>
+                        <option value="SUSPICIOUS" {% if ioc.status == 'SUSPICIOUS' %}selected{% endif %}>SUSPICIOUS</option>
+                        <option value="CONFIRMED" {% if ioc.status == 'CONFIRMED' %}selected{% endif %}>CONFIRMED</option>
+                        <option value="BENIGN" {% if ioc.status == 'BENIGN' %}selected{% endif %}>BENIGN</option>
+                        <option value="UNKNOWN" {% if ioc.status == 'UNKNOWN' %}selected{% endif %}>UNKNOWN</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Confidence Rating</label>
+                    <select name="confidence" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                        <option value="LOW" {% if ioc.confidence == 'LOW' %}selected{% endif %}>LOW</option>
+                        <option value="MEDIUM" {% if ioc.confidence == 'MEDIUM' %}selected{% endif %}>MEDIUM</option>
+                        <option value="HIGH" {% if ioc.confidence == 'HIGH' %}selected{% endif %}>HIGH</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Analyst Notes</label>
+                    <textarea name="notes" rows="2" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">{{ ioc.notes or '' }}</textarea>
+                </div>
+
+                <button type="submit" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold transition-colors">
+                    Update IOC Triage
+                </button>
+            </form>
+        </div>
+
+        <!-- Associated Cases -->
+        <div class="lg:col-span-2 bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3">Associated Investigation Cases ({{ associated_cases|length }})</h3>
+            <div class="divide-y divide-slate-800 text-xs">
+                {% for c in associated_cases %}
+                <div class="py-2.5 flex items-center justify-between">
+                    <div>
+                        <a href="{{ url_for('cases.view', case_id=c.id) }}" class="font-mono text-purple-400 font-bold hover:underline">
+                            {{ c.id }}
+                        </a>
+                        <div class="text-slate-300 font-medium">{{ c.title }}</div>
+                    </div>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-800 text-slate-300">
+                        {{ c.status }}
+                    </span>
+                </div>
+                {% else %}
+                <div class="py-4 text-slate-500 text-center">No cases currently linked to this indicator.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Telemetry Hits -->
+    <div class="bg-soc-surface border border-soc-border rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider">
+            Network Telemetry Hits ({{ telemetry_events|length }})
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="text-[10px] uppercase text-slate-400 bg-slate-900/80 border-b border-slate-800">
+                    <tr>
+                        <th class="py-2.5 px-3">Time</th>
+                        <th class="py-2.5 px-3">Source</th>
+                        <th class="py-2.5 px-3">Destination</th>
+                        <th class="py-2.5 px-3">Port / Protocol</th>
+                        <th class="py-2.5 px-3">Action</th>
+                        <th class="py-2.5 px-3 text-right">Raw</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% for ev in telemetry_events %}
+                    <tr class="hover:bg-slate-900/40">
+                        <td class="py-2 px-3 font-mono text-[11px] text-slate-300">{{ ev.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td class="py-2 px-3 font-mono text-cyan-300">{{ ev.source_ip }}</td>
+                        <td class="py-2 px-3 font-mono text-slate-200">{{ ev.destination_ip }}</td>
+                        <td class="py-2 px-3 font-mono text-slate-400">{{ ev.protocol }} {% if ev.destination_port %}:{{ ev.destination_port }}{% endif %}</td>
+                        <td class="py-2 px-3">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {% if ev.action == 'ALLOW' %}bg-emerald-950 text-emerald-400 border border-emerald-800{% else %}bg-rose-950 text-rose-400 border border-rose-800{% endif %}">
+                                {{ ev.action }}
+                            </span>
+                        </td>
+                        <td class="py-2 px-3 text-right">
+                            <a href="{{ url_for('logs.traffic_detail', event_id=ev.id) }}" class="px-2 py-0.5 bg-slate-800 text-slate-300 rounded text-[11px]">Inspect</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="py-4 text-center text-slate-500">No telemetry events recorded for this indicator.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

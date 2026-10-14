@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Network Threat Graph | NetSentry SOC{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <!-- Graph Banner & Filter -->
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-soc-surface border border-soc-border p-4 rounded-xl">
+        <div>
+            <h1 class="text-lg font-bold text-white flex items-center space-x-2">
+                <i class="fa-solid fa-diagram-project text-cyan-400"></i>
+                <span>Network Threat Topology Graph</span>
+            </h1>
+            <p class="text-xs text-slate-400">Interactive link analysis between internal endpoints, external IP entities, DNS domains, and open cases.</p>
+        </div>
+
+        <form method="GET" action="{{ url_for('graph.index') }}" class="flex items-center space-x-2">
+            <select name="case_id" onchange="this.form.submit()" class="px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200">
+                <option value="">Global Telemetry Topology</option>
+                {% for c in cases %}
+                <option value="{{ c.id }}" {% if selected_case_id == c.id %}selected{% endif %}>Case: {{ c.id }} - {{ c.title }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+
+    <!-- Main Graph Canvas & Inspector Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <!-- Cytoscape Canvas Container -->
+        <div class="lg:col-span-3 bg-soc-surface border border-soc-border rounded-xl p-4 shadow-md flex flex-col">
+            <!-- Canvas Controls -->
+            <div class="flex items-center justify-between mb-3 text-xs">
+                <div class="flex items-center space-x-2">
+                    <button type="button" onclick="setLayout('cose')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] border border-slate-700 transition-colors">Force Directed</button>
+                    <button type="button" onclick="setLayout('circle')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] border border-slate-700 transition-colors">Circular</button>
+                    <button type="button" onclick="setLayout('breadthfirst')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] border border-slate-700 transition-colors">Hierarchy</button>
+                    <button type="button" onclick="cy.fit()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] border border-slate-700 transition-colors" title="Fit to view"><i class="fa-solid fa-expand"></i></button>
+                </div>
+                <div class="flex items-center space-x-3 text-[10px] text-slate-400">
+                    <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-sm bg-sky-400"></span><span>Endpoint</span></span>
+                    <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-400"></span><span>Internal IP</span></span>
+                    <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-sm bg-rose-400"></span><span>External IP</span></span>
+                    <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-sm bg-amber-400"></span><span>Domain</span></span>
+                </div>
+            </div>
+
+            <!-- Canvas Viewport -->
+            <div id="cy" class="w-full h-[550px] bg-slate-950 rounded-lg border border-slate-800 relative"></div>
+        </div>
+
+        <!-- Node Inspector Panel -->
+        <div class="bg-soc-surface border border-soc-border rounded-xl p-4 shadow-md flex flex-col justify-between">
+            <div>
+                <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3 flex items-center space-x-2">
+                    <i class="fa-solid fa-circle-info text-cyan-400"></i>
+                    <span>Entity Inspector</span>
+                </h3>
+
+                <div id="inspectorDefault" class="text-center py-16 text-slate-500 text-xs">
+                    <i class="fa-solid fa-arrow-pointer text-2xl mb-2 block text-slate-600"></i>
+                    Click any node or relationship link on the graph to inspect forensic attributes.
+                </div>
+
+                <div id="inspectorDetails" class="hidden space-y-3 text-xs">
+                    <div class="p-3 bg-slate-900 rounded-lg border border-slate-800">
+                        <span id="inspectType" class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-slate-800 text-cyan-400 border border-slate-700">ENTITY</span>
+                        <div id="inspectLabel" class="text-sm font-bold text-white font-mono mt-1">Select an item</div>
+                    </div>
+
+                    <div class="space-y-2 text-[11px]">
+                        <div class="flex justify-between py-1 border-b border-slate-800">
+                            <span class="text-slate-400">Associated Alerts:</span>
+                            <span id="inspectAlerts" class="font-bold text-rose-400 font-mono">0</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-slate-800">
+                            <span class="text-slate-400">Telemetry Events:</span>
+                            <span id="inspectEvents" class="font-bold text-cyan-400 font-mono">0</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-slate-800">
+                            <span class="text-slate-400">First Observed:</span>
+                            <span id="inspectFirst" class="font-mono text-slate-300">N/A</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-slate-800">
+                            <span class="text-slate-400">Last Telemetry:</span>
+                            <span id="inspectLast" class="font-mono text-slate-300">N/A</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-[11px] text-slate-500 p-2.5 bg-slate-900/40 rounded border border-slate-800/80">
+                <i class="fa-solid fa-mouse text-[10px] mr-1 text-slate-400"></i> Scroll to zoom &bull; Drag to pan &bull; Click to inspect
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    let cy;
+
+    fetch('/api/graph{% if selected_case_id %}?case_id={{ selected_case_id }}{% endif %}')
+        .then(res => res.json())
+        .then(data => {
+            const elements = [];
+            data.nodes.forEach(n => elements.push(n));
+            data.edges.forEach(e => elements.push(e));
+
+            cy = cytoscape({
+                container: document.getElementById('cy'),
+                elements: elements,
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': 'data(color)',
+                            'label': 'data(label)',
+                            'color': '#f8fafc',
+                            'font-size': '10px',
+                            'text-valign': 'bottom',
+                            'text-margin-y': 6,
+                            'shape': 'data(shape)',
+                            'width': 30,
+                            'height': 30,
+                            'border-width': 2,
+                            'border-color': '#0f172a'
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 2,
+                            'line-color': 'data(color)',
+                            'target-arrow-color': 'data(color)',
+                            'target-arrow-shape': 'triangle',
+                            'curve-style': 'bezier',
+                            'label': 'data(label)',
+                            'font-size': '8px',
+                            'color': '#94a3b8'
+                        }
+                    },
+                    {
+                        selector: ':selected',
+                        style: {
+                            'border-width': 3,
+                            'border-color': '#38bdf8',
+                            'line-color': '#38bdf8',
+                            'target-arrow-color': '#38bdf8'
+                        }
+                    }
+                ],
+                layout: {
+                    name: 'cose',
+                    animate: false,
+                    padding: 40
+                }
+            });
+
+            // Node click handler
+            cy.on('tap', 'node', function(evt){
+                const node = evt.target;
+                const d = node.data();
+
+                document.getElementById('inspectorDefault').classList.add('hidden');
+                document.getElementById('inspectorDetails').classList.remove('hidden');
+
+                document.getElementById('inspectType').innerText = (d.type || 'ENTITY').toUpperCase();
+                document.getElementById('inspectLabel').innerText = d.label || d.id;
+                document.getElementById('inspectAlerts').innerText = d.alert_count || '0';
+                document.getElementById('inspectEvents').innerText = d.event_count || '1';
+                document.getElementById('inspectFirst').innerText = d.first_seen ? d.first_seen.substring(0, 19) : 'N/A';
+                document.getElementById('inspectLast').innerText = d.last_seen ? d.last_seen.substring(0, 19) : 'N/A';
+            });
+        });
+
+    function setLayout(name) {
+        if (cy) {
+            cy.layout({ name: name, animate: true, animationDuration: 400 }).run();
+        }
+    }
+</script>
+{% endblock %}

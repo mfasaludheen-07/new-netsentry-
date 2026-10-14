@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Event #{{ event.id }} Inspection | NetSentry SOC{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-5">
+    <div class="flex items-center justify-between bg-soc-surface border border-soc-border p-4 rounded-xl">
+        <div>
+            <div class="flex items-center space-x-2">
+                <a href="{{ url_for('logs.traffic') }}" class="text-xs text-slate-400 hover:text-cyan-400">&larr; Traffic Explorer</a>
+                <span class="text-slate-600">&bull;</span>
+                <span class="text-xs font-mono text-cyan-400">Event ID #{{ event.id }}</span>
+            </div>
+            <h1 class="text-base font-bold text-white mt-1">Deep Telemetry Packet Inspector</h1>
+        </div>
+        <div>
+            <span class="px-2.5 py-1 rounded text-xs font-bold uppercase
+                {% if event.action == 'ALLOW' %}bg-emerald-950 text-emerald-400 border border-emerald-800
+                {% else %}bg-rose-950 text-rose-400 border border-rose-800{% endif %}">
+                VERDICT: {{ event.action }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Normalized Flow Properties -->
+    <div class="bg-soc-surface border border-soc-border p-5 rounded-xl shadow-sm">
+        <h2 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">
+            Canonical Flow Attributes
+        </h2>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
+            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+                <span class="text-slate-500 text-[10px] uppercase font-semibold">Timestamp (UTC)</span>
+                <div class="text-slate-200 font-mono mt-0.5">{{ event.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+            </div>
+
+            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+                <span class="text-slate-500 text-[10px] uppercase font-semibold">Source Endpoint</span>
+                <div class="text-cyan-400 font-mono font-bold mt-0.5">{{ event.source_ip }}{% if event.source_port %}:{{ event.source_port }}{% endif %}</div>
+                {% if event.hostname %}<div class="text-[10px] text-slate-400">{{ event.hostname }}</div>{% endif %}
+            </div>
+
+            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+                <span class="text-slate-500 text-[10px] uppercase font-semibold">Destination Target</span>
+                <div class="text-amber-400 font-mono font-bold mt-0.5">{{ event.destination_ip }}{% if event.destination_port %}:{{ event.destination_port }}{% endif %}</div>
+                {% if event.domain %}<div class="text-[10px] text-slate-400 truncate">{{ event.domain }}</div>{% endif %}
+            </div>
+
+            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+                <span class="text-slate-500 text-[10px] uppercase font-semibold">Protocol / Classification</span>
+                <div class="text-slate-200 font-mono mt-0.5">{{ event.protocol }} ({{ event.event_type }})</div>
+            </div>
+
+            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+                <span class="text-slate-500 text-[10px] uppercase font-semibold">Bytes Transferred</span>
+                <div class="text-slate-200 font-mono mt-0.5">
+                    Sent: {{ event.bytes_sent|filesizeformat }} &bull; Recv: {{ event.bytes_received|filesizeformat }}
+                </div>
+            </div>
+
+            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+                <span class="text-slate-500 text-[10px] uppercase font-semibold">Associated Account</span>
+                <div class="text-slate-200 font-mono mt-0.5">{{ event.username or 'Unauthenticated / System' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Raw Event Log -->
+    <div class="bg-soc-surface border border-soc-border p-5 rounded-xl shadow-sm">
+        <h2 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-2">
+            Raw Telemetry Capture Record
+        </h2>
+        <pre class="bg-slate-950 p-4 rounded-lg border border-slate-800 text-[11px] text-emerald-400 font-mono overflow-x-auto whitespace-pre-wrap leading-relaxed">{{ event.raw_event }}</pre>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Alert {{ alert.id }} | NetSentry SOC{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-soc-surface border border-soc-border p-4 rounded-xl">
+        <div>
+            <div class="flex items-center space-x-2">
+                <a href="{{ url_for('alerts.index') }}" class="text-xs text-slate-400 hover:text-cyan-400">&larr; Alerts Catalog</a>
+                <span class="text-slate-600">&bull;</span>
+                <span class="text-xs font-mono text-cyan-400 font-bold">{{ alert.id }}</span>
+            </div>
+            <h1 class="text-lg font-bold text-white mt-1">{{ alert.title }}</h1>
+            <p class="text-xs text-slate-400 mt-0.5">{{ alert.description }}</p>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <span class="px-2.5 py-1 rounded text-xs font-bold uppercase
+                {% if alert.severity == 'CRITICAL' %}bg-rose-950 text-rose-400 border border-rose-800
+                {% elif alert.severity == 'HIGH' %}bg-orange-950 text-orange-400 border border-orange-800
+                {% elif alert.severity == 'MEDIUM' %}bg-amber-950 text-amber-400 border border-amber-800
+                {% else %}bg-slate-800 text-slate-400 border border-slate-700{% endif %}">
+                {{ alert.severity }}
+            </span>
+            <span class="px-2.5 py-1 rounded text-xs font-bold uppercase
+                {% if alert.status == 'NEW' %}bg-cyan-950 text-cyan-400 border border-cyan-800
+                {% elif alert.status == 'INVESTIGATING' %}bg-purple-950 text-purple-400 border border-purple-800
+                {% elif alert.status == 'RESOLVED' %}bg-emerald-950 text-emerald-400 border border-emerald-800
+                {% else %}bg-slate-800 text-slate-400 border border-slate-700{% endif %}">
+                {{ alert.status }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Triage & Case Linking Controls -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- Triage Action Box -->
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3 flex items-center space-x-2">
+                <i class="fa-solid fa-clipboard-check text-cyan-400"></i>
+                <span>SOC Analyst Triage Status</span>
+            </h3>
+            <form method="POST" action="{{ url_for('alerts.triage', alert_id=alert.id) }}" class="flex items-center space-x-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <select name="status" class="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+                    <option value="NEW" {% if alert.status == 'NEW' %}selected{% endif %}>NEW</option>
+                    <option value="TRIAGED" {% if alert.status == 'TRIAGED' %}selected{% endif %}>TRIAGED</option>
+                    <option value="INVESTIGATING" {% if alert.status == 'INVESTIGATING' %}selected{% endif %}>INVESTIGATING</option>
+                    <option value="RESOLVED" {% if alert.status == 'RESOLVED' %}selected{% endif %}>RESOLVED</option>
+                    <option value="FALSE_POSITIVE" {% if alert.status == 'FALSE_POSITIVE' %}selected{% endif %}>FALSE_POSITIVE</option>
+                </select>
+                <button type="submit" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold transition-colors">
+                    Update Status
+                </button>
+            </form>
+        </div>
+
+        <!-- Attach to Case Box -->
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3 flex items-center space-x-2">
+                <i class="fa-solid fa-folder-plus text-purple-400"></i>
+                <span>Attach to Active Investigation Case</span>
+            </h3>
+            <form method="POST" action="{{ url_for('alerts.attach_case', alert_id=alert.id) }}" class="flex items-center space-x-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <select name="case_id" class="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-cyan-500" required>
+                    <option value="">-- Choose Target Investigation Case --</option>
+                    {% for c in available_cases %}
+                    <option value="{{ c.id }}">{{ c.id }} - {{ c.title }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold transition-colors">
+                    Link Alert
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Alert Context Details -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+        <div class="bg-soc-surface border border-soc-border p-3 rounded-lg">
+            <span class="text-slate-500 text-[10px] uppercase font-semibold">Source Host / IP</span>
+            <div class="text-cyan-400 font-mono font-bold mt-0.5">{{ alert.source_ip or 'N/A' }}</div>
+            {% if alert.endpoint %}<div class="text-[10px] text-slate-400">{{ alert.endpoint }}</div>{% endif %}
+        </div>
+        <div class="bg-soc-surface border border-soc-border p-3 rounded-lg">
+            <span class="text-slate-500 text-[10px] uppercase font-semibold">Target / Destination</span>
+            <div class="text-amber-400 font-mono font-bold mt-0.5">{{ alert.destination_ip or 'Broadcast / Subnet' }}</div>
+        </div>
+        <div class="bg-soc-surface border border-soc-border p-3 rounded-lg">
+            <span class="text-slate-500 text-[10px] uppercase font-semibold">First / Last Seen</span>
+            <div class="text-slate-200 font-mono mt-0.5">{{ alert.first_seen.strftime('%H:%M:%S') }} &bull; {{ alert.last_seen.strftime('%H:%M:%S') }}</div>
+        </div>
+        <div class="bg-soc-surface border border-soc-border p-3 rounded-lg">
+            <span class="text-slate-500 text-[10px] uppercase font-semibold">Confidence Rating</span>
+            <div class="text-slate-200 font-semibold mt-0.5">{{ alert.confidence }} Confidence</div>
+        </div>
+    </div>
+
+    <!-- Correlated Events Association -->
+    <div class="bg-soc-surface border border-soc-border rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+            <span>Correlated Network Events ({{ events|length }})</span>
+            <span class="text-slate-500 font-mono text-[11px]">Direct rule triggers</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="text-[10px] uppercase text-slate-400 bg-slate-900/80 border-b border-slate-800">
+                    <tr>
+                        <th class="py-2 px-3">Time</th>
+                        <th class="py-2 px-3">Source</th>
+                        <th class="py-2 px-3">Destination</th>
+                        <th class="py-2 px-3">Port & Protocol</th>
+                        <th class="py-2 px-3">Bytes</th>
+                        <th class="py-2 px-3">Action</th>
+                        <th class="py-2 px-3 text-right">Raw</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% for ev in events %}
+                    <tr class="hover:bg-slate-900/40">
+                        <td class="py-2 px-3 font-mono text-[11px] text-slate-300 whitespace-nowrap">{{ ev.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td class="py-2 px-3 font-mono text-cyan-300">{{ ev.source_ip }}</td>
+                        <td class="py-2 px-3 font-mono text-slate-300">{{ ev.destination_ip }}</td>
+                        <td class="py-2 px-3 font-mono text-slate-400">{{ ev.protocol }} {% if ev.destination_port %}:{{ ev.destination_port }}{% endif %}</td>
+                        <td class="py-2 px-3 font-mono text-[11px] text-slate-400">{{ (ev.bytes_sent + ev.bytes_received)|filesizeformat }}</td>
+                        <td class="py-2 px-3">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase
+                                {% if ev.action == 'ALLOW' %}bg-emerald-950 text-emerald-400 border border-emerald-800
+                                {% else %}bg-rose-950 text-rose-400 border border-rose-800{% endif %}">
+                                {{ ev.action }}
+                            </span>
+                        </td>
+                        <td class="py-2 px-3 text-right">
+                            <a href="{{ url_for('logs.traffic_detail', event_id=ev.id) }}" class="px-2 py-0.5 bg-slate-800 text-slate-300 hover:text-white rounded text-[11px]">
+                                Inspect
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="py-4 text-center text-slate-500">No discrete events bound to this alert.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}{{ report.title }} | NetSentry Report{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <!-- Header with Print Button -->
+    <div class="flex items-center justify-between bg-soc-surface border border-soc-border p-4 rounded-xl shadow-md">
+        <div>
+            <div class="flex items-center space-x-2">
+                <a href="{{ url_for('reports.index') }}" class="text-xs text-slate-400 hover:text-cyan-400">&larr; Reports Catalog</a>
+                <span class="text-slate-600">&bull;</span>
+                <span class="text-xs font-mono text-purple-400">Report #{{ report.id }}</span>
+            </div>
+            <h1 class="text-lg font-bold text-white mt-1">{{ report.title }}</h1>
+            <div class="text-[11px] text-slate-400 font-mono mt-0.5">Compiled: {{ report.generated_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <a href="{{ url_for('reports.print_report', report_id=report.id) }}" target="_blank" class="px-4 py-2 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md transition-all flex items-center space-x-1.5">
+                <i class="fa-solid fa-print"></i>
+                <span>Open Printable Report</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Report Body Container (16 Sections) -->
+    <div class="bg-soc-surface border border-soc-border rounded-xl p-6 lg:p-8 space-y-8 shadow-md text-xs leading-relaxed">
+        
+        <!-- Section 1: Executive Case Information -->
+        <section class="border-b border-slate-800 pb-6">
+            <div class="flex items-center space-x-2 text-cyan-400 font-bold uppercase tracking-wider text-xs mb-3">
+                <span class="w-5 h-5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 flex items-center justify-center text-[10px]">1</span>
+                <h2>Executive Case Details</h2>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-slate-900/80 rounded-xl border border-slate-800">
+                <div>
+                    <span class="text-slate-500 text-[10px] uppercase font-semibold">Case ID</span>
+                    <div class="font-mono font-bold text-purple-400 text-sm mt-0.5">{{ data.case.id if data.case else report.case_id }}</div>
+                </div>
+                <div>
+                    <span class="text-slate-500 text-[10px] uppercase font-semibold">Incident Severity</span>
+                    <div class="font-bold text-rose-400 mt-0.5">{{ data.case.severity if data.case else 'HIGH' }}</div>
+                </div>
+                <div>
+                    <span class="text-slate-500 text-[10px] uppercase font-semibold">Status / Priority</span>
+                    <div class="font-semibold text-slate-200 mt-0.5">{{ data.case.status if data.case else 'INVESTIGATING' }} (P: {{ data.case.priority if data.case else 'HIGH' }})</div>
+                </div>
+                <div>
+                    <span class="text-slate-500 text-[10px] uppercase font-semibold">Lead Investigator</span>
+                    <div class="font-semibold text-slate-200 mt-0.5">{{ data.case.assigned_to if data.case else 'Security Operations' }}</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Executive Summary -->
+        <section class="border-b border-slate-800 pb-6">
+            <div class="flex items-center space-x-2 text-cyan-400 font-bold uppercase tracking-wider text-xs mb-3">
+                <span class="w-5 h-5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 flex items-center justify-center text-[10px]">2</span>
+                <h2>Executive Threat Summary</h2>
+            </div>
+            <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 text-slate-300 space-y-2">
+                <p>{{ data.case.description if data.case and data.case.description else (report.summary or 'Forensic analysis confirmed correlated reconnaissance probing, credential/service engagement, and high-volume egress activity originating from internal assets.') }}</p>
+            </div>
+        </section>
+
+        <!-- Section 3: Detection Alerts Summary -->
+        <section class="border-b border-slate-800 pb-6">
+            <div class="flex items-center space-x-2 text-cyan-400 font-bold uppercase tracking-wider text-xs mb-3">
+                <span class="w-5 h-5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 flex items-center justify-center text-[10px]">3</span>
+                <h2>Triggered Threat Detection Alerts</h2>
+            </div>
+            <div class="space-y-2">
+                {% if data.alerts %}
+                {% for a in data.alerts %}
+                <div class="p-3 bg-slate-900/80 rounded-lg border border-slate-800 flex items-center justify-between">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="font-mono text-cyan-300 font-bold">{{ a.id }}</span>
+                            <span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-rose-950 text-rose-400 border border-rose-800">{{ a.severity }}</span>
+                            <span class="text-slate-200 font-semibold">{{ a.title }}</span>
+                        </div>
+                        <div class="text-[11px] text-slate-400 font-mono mt-0.5">{{ a.source_ip }} &rarr; {{ a.destination_ip }} ({{ a.event_count }} events)</div>
+                    </div>
+                    <span class="text-[10px] text-slate-400 font-mono">{{ a.confidence }} Confidence</span>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-slate-500 italic">No alerts bound to report snapshot.</p>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- Section 4: Affected Endpoints -->
+        <section class="border-b border-slate-800 pb-6">
+            <div class="flex items-center space-x-2 text-cyan-400 font-bold uppercase tracking-wider text-xs mb-3">
+                <span class="w-5 h-5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 flex items-center justify-center text-[10px]">4</span>
+                <h2>Compromised / Profiled Endpoints</h2>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {% if data.endpoints %}
+                {% for ep in data.endpoints %}
+                <div class="p-3 bg-slate-900/80 rounded-lg border border-slate-800">
+                    <div class="font-bold text-slate-200 flex items-center justify-between">
+                        <span>{{ ep.hostname }}</span>
+                        <span class="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase bg-slate-800 text-slate-300">{{ ep.criticality }}</span>
+                    </div>
+                    <div class="text-[11px] font-mono text-cyan-400 mt-0.5">{{ ep.ip_address }}</div>
+                    <div class="text-[10px] text-slate-400 mt-1">{{ ep.owner_description or ep.os_info }}</div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-slate-500 italic">No specific endpoints flagged.</p>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- Section 5: IOCs -->
+        <section class="border-b border-slate-800 pb-6">
+            <div class="flex items-center space-x-2 text-cyan-400 font-bold uppercase tracking-wider text-xs mb-3">
+                <span class="w-5 h-5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 flex items-center justify-center text-[10px]">5</span>
+                <h2>Indicators of Compromise (IOCs)</h2>
+            </div>
+            <div class="divide-y divide-slate-800 bg-slate-900/60 rounded-xl border border-slate-800">
+                {% if data.iocs %}
+                {% for i in data.iocs %}
+                <div class="p-2.5 flex items-center justify-between font-mono text-[11px]">
+                    <span class="text-cyan-300 font-bold">{{ i.value }}</span>
+                    <div class="space-x-2">
+                        <span class="text-slate-400">{{ i.type }}</span>
+                        <span class="text-rose-400 uppercase font-semibold">[{{ i.status }}]</span>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="p-3 text-slate-500 italic">No IOCs associated with this investigation.</div>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- Section 6: Attack Path Reconstruction -->
+        <section class="border-b border-slate-800 pb-6">
+            <div class="flex items-center space-x-2 text-cyan-400 font-bold uppercase tracking-wider text-xs mb-3">
+                <span class="w-5 h-5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 flex items-center justify-center text-[10px]">6</span>
+                <h2>Attack Path Reconstruction</h2>
+            </div>
+            <div class="space-y-2.5">
+                {% if data.attack_stages %}
+                {% for s in data.attack_stages %}
+                <div class="p-3 bg-slate-900/80 rounded-lg border border-slate-800">
+                    <div class="flex items-center justify-between mb-1">
+                        <div class="font-bold text-slate-200">Stage {{ s.order }}: {{ s.name }}</div>
+                        <span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-purple-950 text-purple-400 border border-purple-800">{{ s.status }}</span>
+                    </div>
+                    {% if s.evidence_summary %}
+                    <p class="text-[11px] text-slate-400">{{ s.evidence_summary }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-slate-500 italic">Attack reconstruction stages not recorded.</p>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- Section 7: MITRE ATT&CK Mapping -->
+        <section class="border-b border-slate-800 pb-6">
+            <div class="flex items-center space-x-2 text-cyan-400 font-bold uppercase tracking-wider text-xs mb-3">
+                <span class="w-5 h-5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 flex items-center justify-center text-[10px]">7</span>
+                <h2>MITRE ATT&CK Mapping</h2>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {% if data.mitre %}
+                {% for m in data.mitre %}
+                <div class="p-3 bg-slate-900/80 rounded-lg border border-slate-800">
+                    <div class="flex items-center justify-between">
+                        <span class="font-mono text-cyan-400 font-bold">{{ m.technique_id }}</span>
+                        <span class="text-[9px] font-bold text-slate-400 uppercase">{{ m.status }}</span>
+                    </div>
+                    <div class="font-semibold text-slate-200 mt-1">{{ m.name }}</div>
+                    <div class="text-[10px] text-slate-500 font-mono">Tactic: {{ m.tactic }}</div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-slate-500 italic">No MITRE techniques mapped.</p>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- Section 8: Forensic Evidence & Integrity Hashes -->
+        <section class="border-b border-slate-800 pb-6">
+            <div class="flex items-center space-x-2 text-cyan-400 font-bold uppercase tracking-wider text-xs mb-3">
+                <span class="w-5 h-5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 flex items-center justify-center text-[10px]">8</span>
+                <h2>Forensic Evidence & Cryptographic Integrity</h2>
+            </div>
+            <div class="space-y-2">
+                {% if data.evidence %}
+                {% for ev in data.evidence %}
+                <div class="p-3 bg-slate-900/80 rounded-lg border border-slate-800 font-mono text-[11px]">
+                    <div class="flex items-center justify-between text-slate-200 font-bold mb-1">
+                        <span>{{ ev.filename }}</span>
+                        <span class="text-slate-400">{{ ev.size|filesizeformat }}</span>
+                    </div>
+                    <div class="text-cyan-400 text-[10px]">SHA-256: {{ ev.hash_sha256 }}</div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-slate-500 italic">No physical evidence artifacts attached.</p>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- Section 9: Findings & Recommendations -->
+        <section>
+            <div class="flex items-center space-x-2 text-cyan-400 font-bold uppercase tracking-wider text-xs mb-3">
+                <span class="w-5 h-5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 flex items-center justify-center text-[10px]">9</span>
+                <h2>Analyst Findings & Remediation Guidance</h2>
+            </div>
+            <div class="space-y-3">
+                {% if data.findings %}
+                {% for f in data.findings %}
+                <div class="p-3 bg-slate-900/80 rounded-lg border border-slate-800">
+                    <div class="font-bold text-slate-200">{{ f.title }}</div>
+                    <p class="text-slate-300 text-[11px] mt-1">{{ f.description }}</p>
+                </div>
+                {% endfor %}
+                {% endif %}
+
+                <!-- Remediation Plan -->
+                <div class="p-4 bg-slate-900 rounded-xl border border-slate-800 text-slate-300 space-y-2">
+                    <div class="font-bold text-white text-xs uppercase tracking-wider">Recommended Defensive Actions:</div>
+                    <ul class="list-disc list-inside space-y-1 text-[11px] text-slate-300">
+                        <li>Isolate affected host workstations from core internal subnets immediately.</li>
+                        <li>Blacklist identified external IP indicators at perimeter edge firewalls.</li>
+                        <li>Enforce multi-factor authentication (MFA) across all administrative remote protocols (RDP, SSH, WinRM).</li>
+                        <li>Invalidate and rotate active Kerberos tickets and local administrator passwords for profiled machines.</li>
+                        <li>Submit collected PCAP captures and disk triage hashes to central SIEM for enterprise-wide IOC hunting.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Trail | NetSentry SOC{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-soc-surface border border-soc-border p-4 rounded-xl">
+        <div>
+            <h1 class="text-lg font-bold text-white flex items-center space-x-2">
+                <i class="fa-solid fa-list-check text-cyan-400"></i>
+                <span>SOC Immutable Audit Trail</span>
+            </h1>
+            <p class="text-xs text-slate-400">Tamper-evident activity logs recording every authenticated analyst action and system detection.</p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+        <form method="GET" action="{{ url_for('admin.audit_logs') }}" class="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+            <div class="sm:col-span-2">
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Search Audit Logs</label>
+                <input type="text" name="q" value="{{ q }}" placeholder="IP, entity ID, action context..." class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Filter by Action</label>
+                <select name="action" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                    <option value="">All Action Types</option>
+                    {% for act in distinct_actions %}
+                    <option value="{{ act }}" {% if selected_action == act %}selected{% endif %}>{{ act }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex items-end space-x-2">
+                <button type="submit" class="flex-1 py-1.5 px-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-semibold transition-colors">
+                    Filter Logs
+                </button>
+                <a href="{{ url_for('admin.audit_logs') }}" class="py-1.5 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg" title="Clear">
+                    <i class="fa-solid fa-xmark"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Audit Logs Table -->
+    <div class="bg-soc-surface border border-soc-border rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+            <span>Audit Trail Entries ({{ logs_pagination.total }})</span>
+            <span class="text-slate-500 font-mono text-[11px]">Append-Only Record</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="text-[10px] uppercase text-slate-400 bg-slate-900/80 border-b border-slate-800">
+                    <tr>
+                        <th class="py-2.5 px-3">Timestamp (UTC)</th>
+                        <th class="py-2.5 px-3">Action Event</th>
+                        <th class="py-2.5 px-3">Analyst / Actor</th>
+                        <th class="py-2.5 px-3">Entity Type & ID</th>
+                        <th class="py-2.5 px-3">Source IP</th>
+                        <th class="py-2.5 px-3">Details / Context</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% for l in logs_pagination.items %}
+                    <tr class="hover:bg-slate-900/40">
+                        <td class="py-3 px-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">
+                            {{ l.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}
+                        </td>
+                        <td class="py-3 px-3">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase bg-slate-800 text-slate-300 border border-slate-700">
+                                {{ l.action }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-3 font-semibold text-slate-200">
+                            {{ l.user.username if l.user else 'System Engine' }}
+                        </td>
+                        <td class="py-3 px-3 font-mono text-[11px] text-cyan-400">
+                            {{ l.entity_type or 'SYSTEM' }}{% if l.entity_id %}: #{{ l.entity_id }}{% endif %}
+                        </td>
+                        <td class="py-3 px-3 font-mono text-[11px] text-slate-400">
+                            {{ l.ip_address }}
+                        </td>
+                        <td class="py-3 px-3 text-slate-300 max-w-md">
+                            {{ l.details }}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="py-8 text-center text-slate-500">No audit logs found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if logs_pagination.pages > 1 %}
+        <div class="p-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <div>Page {{ logs_pagination.page }} of {{ logs_pagination.pages }}</div>
+            <div class="flex space-x-1">
+                {% if logs_pagination.has_prev %}
+                <a href="{{ url_for('admin.audit_logs', page=logs_pagination.prev_num, q=q, action=selected_action) }}" class="px-2 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">Prev</a>
+                {% endif %}
+                {% if logs_pagination.has_next %}
+                <a href="{{ url_for('admin.audit_logs', page=logs_pagination.next_num, q=q, action=selected_action) }}" class="px-2 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">Next</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,826 @@
+{% extends "base.html" %}
+
+{% block title %}Case {{ case.id }} | NetSentry SOC{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <!-- Case Header Banner -->
+    <div class="bg-soc-surface border border-soc-border p-4 lg:p-5 rounded-xl shadow-md">
+        <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+            <div>
+                <div class="flex items-center space-x-2">
+                    <a href="{{ url_for('cases.index') }}" class="text-xs text-slate-400 hover:text-cyan-400">&larr; Case Repository</a>
+                    <span class="text-slate-600">&bull;</span>
+                    <span class="text-xs font-mono text-purple-400 font-bold">{{ case.id }}</span>
+                    <span class="text-slate-600">&bull;</span>
+                    <span class="text-xs text-slate-400">Created: {{ case.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                </div>
+                <h1 class="text-xl font-bold text-white mt-1">{{ case.title }}</h1>
+                <p class="text-xs text-slate-400 mt-1 max-w-3xl leading-relaxed">{{ case.description or 'No threat narrative provided.' }}</p>
+            </div>
+
+            <!-- Case Badges & Quick Status Modal Form -->
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="px-2.5 py-1 rounded text-xs font-bold uppercase
+                    {% if case.severity == 'CRITICAL' %}bg-rose-950 text-rose-400 border border-rose-800
+                    {% elif case.severity == 'HIGH' %}bg-orange-950 text-orange-400 border border-orange-800
+                    {% elif case.severity == 'MEDIUM' %}bg-amber-950 text-amber-400 border border-amber-800
+                    {% else %}bg-slate-800 text-slate-400 border border-slate-700{% endif %}">
+                    {{ case.severity }}
+                </span>
+                <span class="px-2.5 py-1 rounded text-xs font-bold uppercase
+                    {% if case.status == 'OPEN' %}bg-rose-950 text-rose-400 border border-rose-800
+                    {% elif case.status == 'INVESTIGATING' %}bg-purple-950 text-purple-400 border border-purple-800
+                    {% elif case.status == 'CONTAINED' %}bg-amber-950 text-amber-400 border border-amber-800
+                    {% elif case.status == 'RESOLVED' %}bg-emerald-950 text-emerald-400 border border-emerald-800
+                    {% else %}bg-slate-800 text-slate-400 border border-slate-700{% endif %}">
+                    {{ case.status }}
+                </span>
+                <span class="px-2 py-1 bg-slate-900 text-slate-300 border border-slate-700 rounded text-xs">
+                    <i class="fa-solid fa-user-shield text-[10px] mr-1 text-cyan-400"></i>{{ case.assignee.username if case.assignee else 'Unassigned' }}
+                </span>
+
+                <!-- Quick Run Correlation Button -->
+                <form method="POST" action="{{ url_for('cases.correlate', case_id=case.id) }}" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="px-2.5 py-1 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-800 rounded text-xs font-medium transition-colors" title="Correlate case events">
+                        <i class="fa-solid fa-link text-xs mr-1"></i> Correlate
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 14 Navigation Tabs -->
+        <div class="flex items-center space-x-1 overflow-x-auto pt-4 mt-4 border-t border-slate-800 text-xs font-medium scrollbar-thin">
+            {% set tabs = [
+                ('overview', 'Overview', 'fa-gauge'),
+                ('events', 'Events (' ~ events|length ~ ')', 'fa-network-wired'),
+                ('alerts', 'Alerts (' ~ alerts|length ~ ')', 'fa-triangle-exclamation'),
+                ('iocs', 'IOCs (' ~ iocs|length ~ ')', 'fa-fingerprint'),
+                ('endpoints', 'Endpoints (' ~ endpoints|length ~ ')', 'fa-desktop'),
+                ('graph', 'Graph', 'fa-diagram-project'),
+                ('timeline', 'Timeline (' ~ timeline_items|length ~ ')', 'fa-timeline'),
+                ('attack_path', 'Attack Path (' ~ attack_stages|length ~ ')', 'fa-route'),
+                ('mitre', 'MITRE ATT&CK (' ~ mitre_mappings|length ~ ')', 'fa-shield-halved'),
+                ('evidence', 'Evidence (' ~ evidence_items|length ~ ')', 'fa-box-archive'),
+                ('findings', 'Findings (' ~ findings|length ~ ')', 'fa-magnifying-glass-chart'),
+                ('notes', 'Notes (' ~ notes|length ~ ')', 'fa-note-sticky'),
+                ('report', 'Report (' ~ reports|length ~ ')', 'fa-file-invoice'),
+                ('audit', 'Audit Log (' ~ audit_trail|length ~ ')', 'fa-list-check')
+            ] %}
+
+            {% for tab_id, tab_label, tab_icon in tabs %}
+            <a href="{{ url_for('cases.view', case_id=case.id, tab=tab_id) }}" class="px-3 py-1.5 rounded-md whitespace-nowrap flex items-center space-x-1.5 transition-colors
+                {% if active_tab == tab_id %}bg-purple-950 text-purple-300 border border-purple-800 font-semibold
+                {% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-900/60{% endif %}">
+                <i class="fa-solid {{ tab_icon }} text-[11px]"></i>
+                <span>{{ tab_label }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Tab 1: OVERVIEW -->
+    {% if active_tab == 'overview' %}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="lg:col-span-2 space-y-5">
+            <!-- Case Summary & Lifecycle -->
+            <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+                <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3">Threat Investigation Scope</h3>
+                <p class="text-xs text-slate-300 leading-relaxed bg-slate-900/70 p-3.5 rounded-lg border border-slate-800 font-mono">
+                    {{ case.description or 'No extended threat narrative documented.' }}
+                </p>
+
+                <!-- Case Metrics Counter -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-xs">
+                    <div class="p-3 bg-slate-900/60 rounded-lg border border-slate-800">
+                        <span class="text-slate-500 text-[10px] uppercase font-semibold">Correlated Events</span>
+                        <div class="text-lg font-bold text-white font-mono mt-0.5">{{ events|length }}</div>
+                    </div>
+                    <div class="p-3 bg-slate-900/60 rounded-lg border border-slate-800">
+                        <span class="text-slate-500 text-[10px] uppercase font-semibold">Active Alerts</span>
+                        <div class="text-lg font-bold text-amber-400 font-mono mt-0.5">{{ alerts|length }}</div>
+                    </div>
+                    <div class="p-3 bg-slate-900/60 rounded-lg border border-slate-800">
+                        <span class="text-slate-500 text-[10px] uppercase font-semibold">Identified IOCs</span>
+                        <div class="text-lg font-bold text-emerald-400 font-mono mt-0.5">{{ iocs|length }}</div>
+                    </div>
+                    <div class="p-3 bg-slate-900/60 rounded-lg border border-slate-800">
+                        <span class="text-slate-500 text-[10px] uppercase font-semibold">Attack Stages</span>
+                        <div class="text-lg font-bold text-purple-400 font-mono mt-0.5">{{ attack_stages|length }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Correlated Linkages -->
+            <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center space-x-2">
+                        <i class="fa-solid fa-link text-cyan-400"></i>
+                        <span>Event Correlation Linkages ({{ correlations|length }})</span>
+                    </h3>
+                </div>
+                <div class="space-y-2">
+                    {% for corr in correlations %}
+                    <div class="p-3 bg-slate-900/80 rounded-lg border border-slate-800 text-xs">
+                        <div class="flex items-center justify-between text-[11px] mb-1">
+                            <span class="font-bold text-cyan-300 font-mono">{{ corr.correlation_type }}</span>
+                            <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-800 text-slate-300">{{ corr.confidence }} CONFIDENCE</span>
+                        </div>
+                        <p class="text-slate-300 text-[11px]">{{ corr.correlation_reason }}</p>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-6 text-slate-500 text-xs">
+                        No automated correlations recorded yet. Click "Correlate" above to evaluate telemetry linkage.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Case Status Manager -->
+        <div class="space-y-5">
+            <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+                <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3">Modify Investigation State</h3>
+                <form method="POST" action="{{ url_for('cases.update_status', case_id=case.id) }}" class="space-y-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Status</label>
+                        <select name="status" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200">
+                            <option value="OPEN" {% if case.status == 'OPEN' %}selected{% endif %}>OPEN</option>
+                            <option value="INVESTIGATING" {% if case.status == 'INVESTIGATING' %}selected{% endif %}>INVESTIGATING</option>
+                            <option value="CONTAINED" {% if case.status == 'CONTAINED' %}selected{% endif %}>CONTAINED</option>
+                            <option value="RESOLVED" {% if case.status == 'RESOLVED' %}selected{% endif %}>RESOLVED</option>
+                            <option value="CLOSED" {% if case.status == 'CLOSED' %}selected{% endif %}>CLOSED</option>
+                            <option value="FALSE_POSITIVE" {% if case.status == 'FALSE_POSITIVE' %}selected{% endif %}>FALSE_POSITIVE</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Severity</label>
+                        <select name="severity" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200">
+                            <option value="CRITICAL" {% if case.severity == 'CRITICAL' %}selected{% endif %}>CRITICAL</option>
+                            <option value="HIGH" {% if case.severity == 'HIGH' %}selected{% endif %}>HIGH</option>
+                            <option value="MEDIUM" {% if case.severity == 'MEDIUM' %}selected{% endif %}>MEDIUM</option>
+                            <option value="LOW" {% if case.severity == 'LOW' %}selected{% endif %}>LOW</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Priority</label>
+                        <select name="priority" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200">
+                            <option value="URGENT" {% if case.priority == 'URGENT' %}selected{% endif %}>URGENT</option>
+                            <option value="HIGH" {% if case.priority == 'HIGH' %}selected{% endif %}>HIGH</option>
+                            <option value="MEDIUM" {% if case.priority == 'MEDIUM' %}selected{% endif %}>MEDIUM</option>
+                            <option value="LOW" {% if case.priority == 'LOW' %}selected{% endif %}>LOW</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Assignee</label>
+                        <select name="assigned_to" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200">
+                            {% for u in users %}
+                            <option value="{{ u.id }}" {% if case.assigned_to == u.id %}selected{% endif %}>{{ u.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <button type="submit" class="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold transition-colors mt-2">
+                        Save Changes
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tab 2: EVENTS -->
+    {% if active_tab == 'events' %}
+    <div class="bg-soc-surface border border-soc-border rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider">
+            Correlated Network Telemetry Events ({{ events|length }})
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="text-[10px] uppercase text-slate-400 bg-slate-900/80 border-b border-slate-800">
+                    <tr>
+                        <th class="py-2.5 px-3">Timestamp</th>
+                        <th class="py-2.5 px-3">Source Host</th>
+                        <th class="py-2.5 px-3">Target Destination</th>
+                        <th class="py-2.5 px-3">Protocol / Port</th>
+                        <th class="py-2.5 px-3">Bytes</th>
+                        <th class="py-2.5 px-3">Action</th>
+                        <th class="py-2.5 px-3 text-right">Inspect</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% for ev in events %}
+                    <tr class="hover:bg-slate-900/40">
+                        <td class="py-2 px-3 font-mono text-[11px] text-slate-300 whitespace-nowrap">{{ ev.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td class="py-2 px-3 font-mono text-cyan-300">{{ ev.source_ip }} {% if ev.hostname %}({{ ev.hostname }}){% endif %}</td>
+                        <td class="py-2 px-3 font-mono text-slate-200">{{ ev.destination_ip }} {% if ev.domain %}({{ ev.domain }}){% endif %}</td>
+                        <td class="py-2 px-3 font-mono text-slate-400">{{ ev.protocol }} {% if ev.destination_port %}:{{ ev.destination_port }}{% endif %}</td>
+                        <td class="py-2 px-3 font-mono text-[11px] text-slate-400">{{ (ev.bytes_sent + ev.bytes_received)|filesizeformat }}</td>
+                        <td class="py-2 px-3">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {% if ev.action == 'ALLOW' %}bg-emerald-950 text-emerald-400 border border-emerald-800{% else %}bg-rose-950 text-rose-400 border border-rose-800{% endif %}">
+                                {{ ev.action }}
+                            </span>
+                        </td>
+                        <td class="py-2 px-3 text-right">
+                            <a href="{{ url_for('logs.traffic_detail', event_id=ev.id) }}" class="px-2 py-0.5 bg-slate-800 text-slate-300 hover:text-white rounded text-[11px]">Inspect</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="py-6 text-center text-slate-500">No events associated directly with this case yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tab 3: ALERTS -->
+    {% if active_tab == 'alerts' %}
+    <div class="bg-soc-surface border border-soc-border rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider">
+            Bound Threat Alerts ({{ alerts|length }})
+        </div>
+        <div class="divide-y divide-slate-800">
+            {% for a in alerts %}
+            <div class="p-3.5 hover:bg-slate-900/40 flex items-start justify-between gap-4 text-xs">
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-mono text-cyan-400 font-bold">{{ a.id }}</span>
+                        <span class="px-2 py-0.2 rounded text-[9px] font-bold uppercase
+                            {% if a.severity == 'CRITICAL' %}bg-rose-950 text-rose-400 border border-rose-800
+                            {% elif a.severity == 'HIGH' %}bg-orange-950 text-orange-400 border border-orange-800
+                            {% else %}bg-amber-950 text-amber-400 border border-amber-800{% endif %}">
+                            {{ a.severity }}
+                        </span>
+                        <span class="text-slate-500 text-[10px] font-mono">{{ a.rule_id }}</span>
+                    </div>
+                    <div class="font-semibold text-slate-200 mt-1">{{ a.title }}</div>
+                    <p class="text-slate-400 text-[11px] mt-0.5">{{ a.description }}</p>
+                </div>
+                <a href="{{ url_for('alerts.view', alert_id=a.id) }}" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded text-xs">
+                    Triage Alert
+                </a>
+            </div>
+            {% else %}
+            <div class="p-6 text-center text-slate-500 text-xs">No alerts linked to this case yet. Attach alerts from the Threat Alerts view.</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tab 4: IOCS -->
+    {% if active_tab == 'iocs' %}
+    <div class="bg-soc-surface border border-soc-border rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider">
+            Indicators of Compromise ({{ iocs|length }})
+        </div>
+        <div class="divide-y divide-slate-800 text-xs">
+            {% for i in iocs %}
+            <div class="p-3.5 hover:bg-slate-900/40 flex items-center justify-between">
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-mono text-cyan-300 font-bold">{{ i.value }}</span>
+                        <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-800 text-slate-300">{{ i.type }}</span>
+                        <span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase
+                            {% if i.status == 'CONFIRMED' %}bg-rose-950 text-rose-400 border border-rose-800
+                            {% elif i.status == 'SUSPICIOUS' %}bg-amber-950 text-amber-400 border border-amber-800
+                            {% else %}bg-slate-800 text-slate-400{% endif %}">
+                            {{ i.status }}
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-0.5">{{ i.notes or 'No contextual notes recorded.' }}</p>
+                </div>
+                <a href="{{ url_for('iocs.view', ioc_id=i.id) }}" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs">Inspect</a>
+            </div>
+            {% else %}
+            <div class="p-6 text-center text-slate-500 text-xs">No indicators linked to this case yet.</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tab 5: ENDPOINTS -->
+    {% if active_tab == 'endpoints' %}
+    <div class="bg-soc-surface border border-soc-border rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider">
+            Affected Endpoint Profiles ({{ endpoints|length }})
+        </div>
+        <div class="divide-y divide-slate-800 text-xs">
+            {% for ep in endpoints %}
+            <div class="p-3.5 hover:bg-slate-900/40 flex items-center justify-between">
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-slate-200">{{ ep.hostname }}</span>
+                        <span class="font-mono text-cyan-400">{{ ep.ip_address }}</span>
+                        <span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase {% if ep.criticality == 'CRITICAL' %}bg-rose-950 text-rose-400 border border-rose-800{% else %}bg-slate-800 text-slate-300{% endif %}">
+                            {{ ep.criticality }}
+                        </span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 mt-0.5">{{ ep.owner_description or 'No owner description.' }}</div>
+                </div>
+                <a href="{{ url_for('endpoints.view', target=ep.hostname) }}" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs">Profile</a>
+            </div>
+            {% else %}
+            <div class="p-6 text-center text-slate-500 text-xs">No specific endpoints flagged for this case.</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tab 6: GRAPH -->
+    {% if active_tab == 'graph' %}
+    <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center space-x-2">
+                <i class="fa-solid fa-diagram-project text-cyan-400"></i>
+                <span>Case Network Topology & Interaction Graph</span>
+            </h3>
+            <span class="text-slate-500 text-[10px] font-mono">Cytoscape Force-Directed</span>
+        </div>
+        <div id="caseCy" class="w-full h-96 bg-slate-950 rounded-lg border border-slate-800 relative"></div>
+    </div>
+    {% endif %}
+
+    <!-- Tab 7: TIMELINE -->
+    {% if active_tab == 'timeline' %}
+    <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+        <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-4">Forensic Event Progression ({{ timeline_items|length }})</h3>
+        <div class="space-y-3 relative before:absolute before:inset-0 before:left-3 before:w-0.5 before:bg-slate-800">
+            {% for item in timeline_items %}
+            <div class="relative pl-8 text-xs">
+                <div class="absolute left-1.5 top-1.5 w-3 h-3 rounded-full border-2 border-slate-950
+                    {% if item.severity == 'CRITICAL' %}bg-rose-500
+                    {% elif item.severity == 'HIGH' %}bg-orange-500
+                    {% elif item.severity == 'MEDIUM' %}bg-amber-500
+                    {% else %}bg-cyan-500{% endif %}"></div>
+                <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+                    <div class="flex items-center justify-between text-[11px] mb-1">
+                        <span class="font-mono text-slate-400">{{ item.event_time.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                        <span class="font-bold text-cyan-400">{{ item.event_type }}</span>
+                    </div>
+                    <p class="text-slate-200 font-medium">{{ item.description }}</p>
+                </div>
+            </div>
+            {% else %}
+            <div class="p-6 text-center text-slate-500 text-xs">No chronological timeline entries recorded yet.</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tab 8: ATTACK PATH RECONSTRUCTION -->
+    {% if active_tab == 'attack_path' %}
+    <div class="space-y-5">
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-4 flex items-center space-x-2">
+                <i class="fa-solid fa-route text-rose-400"></i>
+                <span>Attack Path Stages & Analyst Verification</span>
+            </h3>
+
+            <div class="space-y-3">
+                {% for stg in attack_stages %}
+                <div class="bg-slate-900/80 p-4 rounded-lg border border-slate-800 text-xs">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-6 h-6 rounded-full bg-purple-950 text-purple-400 border border-purple-800 flex items-center justify-center font-bold text-[10px]">
+                                {{ stg.stage_order }}
+                            </span>
+                            <span class="font-bold text-slate-200 text-sm">{{ stg.stage_name }}</span>
+                        </div>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase
+                            {% if stg.status == 'CONFIRMED' %}bg-rose-950 text-rose-400 border border-rose-800
+                            {% elif stg.status == 'OBSERVED' %}bg-amber-950 text-amber-400 border border-amber-800
+                            {% elif stg.status == 'DISPROVED' %}bg-emerald-950 text-emerald-400 border border-emerald-800
+                            {% else %}bg-slate-800 text-slate-400{% endif %}">
+                            {{ stg.status }} ({{ stg.confidence }} Confidence)
+                        </span>
+                    </div>
+                    {% if stg.evidence_summary %}
+                    <div class="text-[11px] text-slate-300 bg-slate-950 p-2.5 rounded border border-slate-800/80 mb-2">
+                        <span class="text-slate-500 text-[10px] font-bold uppercase">Evidence Summary:</span> {{ stg.evidence_summary }}
+                    </div>
+                    {% endif %}
+                    {% if stg.analyst_comment %}
+                    <p class="text-[11px] text-slate-400 italic">Analyst: "{{ stg.analyst_comment }}"</p>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="p-6 text-center text-slate-500 text-xs">No attack stages mapped yet. Document stages below.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Add Attack Stage Form -->
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3">Map New Attack Stage</h4>
+            <form method="POST" action="{{ url_for('cases.add_attack_stage', case_id=case.id) }}" class="space-y-3 text-xs">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Stage Name</label>
+                        <input type="text" name="stage_name" required placeholder="e.g., Potential Lateral Movement" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Status</label>
+                        <select name="status" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                            <option value="SUSPECTED">SUSPECTED</option>
+                            <option value="OBSERVED">OBSERVED</option>
+                            <option value="CONFIRMED">CONFIRMED</option>
+                            <option value="DISPROVED">DISPROVED</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Confidence</label>
+                        <select name="confidence" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                            <option value="MEDIUM">MEDIUM</option>
+                            <option value="HIGH">HIGH</option>
+                            <option value="LOW">LOW</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Evidence Summary</label>
+                    <textarea name="evidence_summary" rows="2" placeholder="Correlated telemetry events or port probes..." class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Analyst Comment</label>
+                    <input type="text" name="analyst_comment" placeholder="Context notes regarding attribution..." class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                </div>
+
+                <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-colors">
+                    Add Stage to Attack Path
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tab 9: MITRE ATT&CK -->
+    {% if active_tab == 'mitre' %}
+    <div class="space-y-5">
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-4 flex items-center space-x-2">
+                <i class="fa-solid fa-shield-halved text-cyan-400"></i>
+                <span>Mapped MITRE ATT&CK Techniques ({{ mitre_mappings|length }})</span>
+            </h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                {% for m in mitre_mappings %}
+                <div class="bg-slate-900/80 p-3.5 rounded-lg border border-slate-800">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="font-mono text-cyan-400 font-bold">{{ m.technique_id }}</span>
+                        <span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase
+                            {% if m.status == 'OBSERVED' %}bg-rose-950 text-rose-400 border border-rose-800
+                            {% elif m.status == 'SUSPECTED' %}bg-amber-950 text-amber-400 border border-amber-800
+                            {% else %}bg-slate-800 text-slate-400{% endif %}">
+                            {{ m.status }}
+                        </span>
+                    </div>
+                    <div class="font-semibold text-slate-200">{{ m.technique.name if m.technique else m.technique_id }}</div>
+                    <div class="text-[10px] text-slate-500 font-mono mt-0.5">Tactic: {{ m.technique.tactic if m.technique else 'General' }}</div>
+                    {% if m.supporting_evidence %}
+                    <p class="text-[11px] text-slate-300 mt-2 bg-slate-950 p-2 rounded">{{ m.supporting_evidence }}</p>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="col-span-2 p-6 text-center text-slate-500 text-xs">No MITRE ATT&CK techniques mapped to this case.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Map Technique Form -->
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3">Map ATT&CK Technique</h4>
+            <form method="POST" action="{{ url_for('cases.add_mitre', case_id=case.id) }}" class="space-y-3 text-xs">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Select MITRE Technique</label>
+                        <select name="technique_id" required class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                            {% for tech in available_techniques %}
+                            <option value="{{ tech.id }}">{{ tech.id }} - {{ tech.name }} ({{ tech.tactic }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Mapping Status</label>
+                        <select name="status" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                            <option value="OBSERVED">OBSERVED</option>
+                            <option value="SUSPECTED" selected>SUSPECTED</option>
+                            <option value="NOT_APPLICABLE">NOT_APPLICABLE</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Supporting Forensic Telemetry Evidence</label>
+                    <textarea name="supporting_evidence" rows="2" placeholder="Observed scan pattern, outbound payload size..." class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200"></textarea>
+                </div>
+
+                <button type="submit" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-semibold transition-colors">
+                    Save MITRE Mapping
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tab 10: EVIDENCE -->
+    {% if active_tab == 'evidence' %}
+    <div class="space-y-5">
+        <div class="bg-soc-surface border border-soc-border rounded-xl overflow-hidden shadow-sm">
+            <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                <span>Forensic Evidence Vault ({{ evidence_items|length }})</span>
+                <span class="text-slate-500 font-mono text-[11px]">Cryptographic SHA-256</span>
+            </div>
+            <div class="divide-y divide-slate-800 text-xs">
+                {% for ev in evidence_items %}
+                <div class="p-4 hover:bg-slate-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="font-bold text-slate-200">{{ ev.original_filename }}</span>
+                            <span class="px-1.5 py-0.2 rounded text-[9px] font-mono bg-slate-800 text-slate-400">{{ ev.size|filesizeformat }}</span>
+                            <span class="text-slate-500 text-[10px] font-mono">{{ ev.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                        </div>
+                        <div class="text-[11px] font-mono text-cyan-400 mt-1">
+                            SHA-256: {{ ev.hash_sha256 }}
+                        </div>
+                        {% if ev.description %}
+                        <p class="text-slate-400 text-[11px] mt-0.5">{{ ev.description }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <form method="POST" action="{{ url_for('evidence.verify', evidence_id=ev.id) }}" class="inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded text-xs transition-colors">
+                                <i class="fa-solid fa-check-double mr-1 text-emerald-400"></i> Verify Hash
+                            </button>
+                        </form>
+                        <a href="{{ url_for('evidence.download', evidence_id=ev.id) }}" class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-semibold transition-colors">
+                            <i class="fa-solid fa-download mr-1"></i> Download
+                        </a>
+                    </div>
+                </div>
+                {% else %}
+                <div class="p-6 text-center text-slate-500 text-xs">No forensic evidence artifacts uploaded to this case dossier.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Upload Evidence Box -->
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3">Upload Case Evidence File</h4>
+            <form method="POST" action="{{ url_for('evidence.upload', case_id=case.id) }}" enctype="multipart/form-data" class="space-y-3 text-xs">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div>
+                    <input type="file" name="evidence_file" required class="text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-950 file:text-purple-400 hover:file:bg-purple-900 cursor-pointer">
+                </div>
+                <div>
+                    <input type="text" name="description" placeholder="Description of artifact, collection source, sensor..." class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                </div>
+                <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-colors">
+                    Upload & Secure Hash
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tab 11: FINDINGS -->
+    {% if active_tab == 'findings' %}
+    <div class="space-y-5">
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-4">Analyst Forensic Findings ({{ findings|length }})</h3>
+            <div class="space-y-3">
+                {% for f in findings %}
+                <div class="bg-slate-900/80 p-3.5 rounded-lg border border-slate-800 text-xs">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="font-bold text-slate-200 text-sm">{{ f.title }}</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {% if f.status == 'CONFIRMED' %}bg-rose-950 text-rose-400 border border-rose-800{% else %}bg-slate-800 text-slate-300{% endif %}">
+                            {{ f.status }} ({{ f.confidence }} Conf.)
+                        </span>
+                    </div>
+                    <p class="text-slate-300 text-[11px] leading-relaxed">{{ f.description }}</p>
+                    {% if f.evidence %}
+                    <div class="mt-2 text-[10px] text-slate-400 font-mono bg-slate-950 p-2 rounded">
+                        Evidence: {{ f.evidence }}
+                    </div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="p-6 text-center text-slate-500 text-xs">No formal findings documented yet.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3">Record Formal Finding</h4>
+            <form method="POST" action="{{ url_for('cases.add_finding', case_id=case.id) }}" class="space-y-3 text-xs">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Finding Title</label>
+                        <input type="text" name="title" required placeholder="e.g. Cobalt Strike Beaconing Signature" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Status</label>
+                        <select name="status" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                            <option value="OBSERVED">OBSERVED</option>
+                            <option value="SUSPECTED">SUSPECTED</option>
+                            <option value="CONFIRMED" selected>CONFIRMED</option>
+                            <option value="DISPROVED">DISPROVED</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Confidence</label>
+                        <select name="confidence" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                            <option value="HIGH">HIGH</option>
+                            <option value="MEDIUM" selected>MEDIUM</option>
+                            <option value="LOW">LOW</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Description / Detailed Analysis</label>
+                    <textarea name="description" rows="2" required placeholder="Detailed analysis and forensic proof..." class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200"></textarea>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Supporting Evidence Reference</label>
+                    <input type="text" name="evidence" placeholder="Hashes, flow IDs, PCAP packet numbers..." class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                </div>
+                <button type="submit" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-semibold transition-colors">
+                    Post Finding
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tab 12: NOTES -->
+    {% if active_tab == 'notes' %}
+    <div class="space-y-5">
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-4">Investigator Working Notes ({{ notes|length }})</h3>
+            <div class="space-y-3">
+                {% for n in notes %}
+                <div class="bg-slate-900/80 p-3.5 rounded-lg border border-slate-800 text-xs">
+                    <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                        <span class="font-bold text-purple-300">{{ n.author.username if n.author else 'Analyst' }}</span>
+                        <span class="font-mono">{{ n.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                    </div>
+                    <p class="text-slate-200 whitespace-pre-wrap leading-relaxed">{{ n.note }}</p>
+                </div>
+                {% else %}
+                <div class="p-6 text-center text-slate-500 text-xs">No notes recorded yet. Post quick thoughts below.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3">Add Analyst Working Note</h4>
+            <form method="POST" action="{{ url_for('cases.add_note', case_id=case.id) }}" class="space-y-3 text-xs">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <textarea name="note" rows="3" required placeholder="Notes on active hypothesis, external threat feed checks, team handoffs..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:border-purple-500"></textarea>
+                <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-colors">
+                    Append Note
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tab 13: REPORT -->
+    {% if active_tab == 'report' %}
+    <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Formal 16-Section Investigation Reports</h3>
+                <p class="text-[11px] text-slate-400">Compile immutable forensic report snapshots for incident response & executives.</p>
+            </div>
+            <form method="POST" action="{{ url_for('reports.generate', case_id=case.id) }}" class="inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="px-3.5 py-1.5 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md transition-all">
+                    <i class="fa-solid fa-file-invoice mr-1"></i> Compile New Report Snapshot
+                </button>
+            </form>
+        </div>
+
+        <div class="divide-y divide-slate-800 text-xs">
+            {% for rep in reports %}
+            <div class="py-3 flex items-center justify-between">
+                <div>
+                    <div class="font-bold text-slate-200">{{ rep.title }}</div>
+                    <div class="text-[11px] text-slate-500 font-mono">Generated: {{ rep.generated_at.strftime('%Y-%m-%d %H:%M') }} by {{ rep.generator.username if rep.generator else 'System' }}</div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <a href="{{ url_for('reports.view', report_id=rep.id) }}" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs">
+                        View Report
+                    </a>
+                    <a href="{{ url_for('reports.print_report', report_id=rep.id) }}" target="_blank" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs">
+                        <i class="fa-solid fa-print mr-1"></i> Print
+                    </a>
+                </div>
+            </div>
+            {% else %}
+            <div class="p-6 text-center text-slate-500 text-xs">No formal reports compiled yet. Click the button above to generate a 16-section report snapshot.</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tab 14: AUDIT -->
+    {% if active_tab == 'audit' %}
+    <div class="bg-soc-surface border border-soc-border rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider">
+            Immutable Case Activity Audit Trail ({{ audit_trail|length }})
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="text-[10px] uppercase text-slate-400 bg-slate-900/80 border-b border-slate-800">
+                    <tr>
+                        <th class="py-2.5 px-3">Timestamp</th>
+                        <th class="py-2.5 px-3">Action</th>
+                        <th class="py-2.5 px-3">Analyst</th>
+                        <th class="py-2.5 px-3">IP Address</th>
+                        <th class="py-2.5 px-3">Details</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% for a in audit_trail %}
+                    <tr class="hover:bg-slate-900/40">
+                        <td class="py-2.5 px-3 font-mono text-[11px] text-slate-400">{{ a.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td class="py-2.5 px-3"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300">{{ a.action }}</span></td>
+                        <td class="py-2.5 px-3 text-slate-200 font-medium">{{ a.user.username if a.user else 'System' }}</td>
+                        <td class="py-2.5 px-3 font-mono text-slate-400 text-[11px]">{{ a.ip_address }}</td>
+                        <td class="py-2.5 px-3 text-slate-300">{{ a.details }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="py-6 text-center text-slate-500">No audit events recorded for this case.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{% if active_tab == 'graph' %}
+<script>
+    fetch('/api/graph?case_id={{ case.id }}')
+        .then(res => res.json())
+        .then(data => {
+            const elements = [];
+            data.nodes.forEach(n => elements.push(n));
+            data.edges.forEach(e => elements.push(e));
+
+            const cy = cytoscape({
+                container: document.getElementById('caseCy'),
+                elements: elements,
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': 'data(color)',
+                            'label': 'data(label)',
+                            'color': '#f8fafc',
+                            'font-size': '10px',
+                            'text-valign': 'bottom',
+                            'text-margin-y': 5,
+                            'shape': 'data(shape)',
+                            'width': 28,
+                            'height': 28
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 2,
+                            'line-color': 'data(color)',
+                            'target-arrow-color': 'data(color)',
+                            'target-arrow-shape': 'triangle',
+                            'curve-style': 'bezier',
+                            'label': 'data(label)',
+                            'font-size': '8px',
+                            'color': '#94a3b8'
+                        }
+                    }
+                ],
+                layout: {
+                    name: 'cose',
+                    animate: false,
+                    padding: 30
+                }
+            });
+        });
+</script>
+{% endif %}
+{% endblock %}

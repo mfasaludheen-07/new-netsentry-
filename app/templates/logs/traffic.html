@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Traffic Explorer | NetSentry SOC{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-soc-surface border border-soc-border p-4 rounded-xl">
+        <div>
+            <h1 class="text-lg font-bold text-white flex items-center space-x-2">
+                <i class="fa-solid fa-network-wired text-cyan-400"></i>
+                <span>Network Traffic Explorer</span>
+            </h1>
+            <p class="text-xs text-slate-400">Deep telemetry search, protocol filtering, and forensic flow inspection across all sensors.</p>
+        </div>
+        <div class="flex items-center space-x-2">
+            <a href="{{ url_for('logs.upload') }}" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1">
+                <i class="fa-solid fa-plus"></i>
+                <span>Ingest Logs</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter Control Card -->
+    <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+        <form method="GET" action="{{ url_for('logs.traffic') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+            <div class="lg:col-span-2">
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Search Keywords</label>
+                <input type="text" name="q" value="{{ q }}" placeholder="IP, host, domain, user..." class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Source IP</label>
+                <input type="text" name="source_ip" value="{{ source_ip }}" placeholder="192.168.1.10" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Target Port</label>
+                <input type="number" name="port" value="{{ port or '' }}" placeholder="22, 445, 53..." class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Protocol</label>
+                <select name="protocol" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+                    <option value="">All Protocols</option>
+                    <option value="TCP" {% if protocol == 'TCP' %}selected{% endif %}>TCP</option>
+                    <option value="UDP" {% if protocol == 'UDP' %}selected{% endif %}>UDP</option>
+                    <option value="ICMP" {% if protocol == 'ICMP' %}selected{% endif %}>ICMP</option>
+                </select>
+            </div>
+
+            <div class="flex items-end space-x-2">
+                <button type="submit" class="flex-1 py-1.5 px-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold transition-colors flex items-center justify-center space-x-1">
+                    <i class="fa-solid fa-filter"></i>
+                    <span>Filter</span>
+                </button>
+                <a href="{{ url_for('logs.traffic') }}" class="py-1.5 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg text-xs transition-colors" title="Clear Filters">
+                    <i class="fa-solid fa-xmark"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Traffic Table -->
+    <div class="bg-soc-surface border border-soc-border rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+            <span>Flow Telemetry Results ({{ events_pagination.total }})</span>
+            <span class="text-slate-500 font-mono text-[11px]">Chronological Order</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="text-[10px] uppercase text-slate-400 bg-slate-900/80 border-b border-slate-800">
+                    <tr>
+                        <th class="py-2.5 px-3">Timestamp</th>
+                        <th class="py-2.5 px-3">Origin (Source)</th>
+                        <th class="py-2.5 px-3">Target (Destination)</th>
+                        <th class="py-2.5 px-3">Protocol / Port</th>
+                        <th class="py-2.5 px-3">Bytes In/Out</th>
+                        <th class="py-2.5 px-3">Action</th>
+                        <th class="py-2.5 px-3 text-right">Inspect</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% for ev in events_pagination.items %}
+                    <tr class="hover:bg-slate-900/40">
+                        <td class="py-2.5 px-3 font-mono text-[11px] text-slate-300 whitespace-nowrap">
+                            {{ ev.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}
+                        </td>
+                        <td class="py-2.5 px-3">
+                            <div class="font-mono text-cyan-300 font-semibold">{{ ev.source_ip }}</div>
+                            <div class="text-[10px] text-slate-400 font-mono">
+                                {% if ev.hostname %}<i class="fa-solid fa-desktop mr-1 text-[9px]"></i>{{ ev.hostname }}{% endif %}
+                                {% if ev.username %}<span class="ml-1 text-slate-500">({{ ev.username }})</span>{% endif %}
+                            </div>
+                        </td>
+                        <td class="py-2.5 px-3">
+                            <div class="font-mono text-slate-200 font-semibold">{{ ev.destination_ip }}</div>
+                            {% if ev.domain %}
+                            <div class="text-[10px] text-amber-400 font-mono truncate max-w-xs" title="{{ ev.domain }}">
+                                <i class="fa-solid fa-link mr-1 text-[9px]"></i>{{ ev.domain }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3">
+                            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-300">
+                                {{ ev.protocol }}
+                            </span>
+                            {% if ev.destination_port %}
+                            <span class="font-mono text-amber-300 text-[11px] font-medium ml-1">:{{ ev.destination_port }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3 font-mono text-[11px] text-slate-400">
+                            <div><i class="fa-solid fa-arrow-up text-[9px] text-rose-400 mr-1"></i>{{ ev.bytes_sent|filesizeformat }}</div>
+                            <div><i class="fa-solid fa-arrow-down text-[9px] text-emerald-400 mr-1"></i>{{ ev.bytes_received|filesizeformat }}</div>
+                        </td>
+                        <td class="py-2.5 px-3">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase
+                                {% if ev.action == 'ALLOW' %}bg-emerald-950 text-emerald-400 border border-emerald-800
+                                {% else %}bg-rose-950 text-rose-400 border border-rose-800{% endif %}">
+                                {{ ev.action }}
+                            </span>
+                        </td>
+                        <td class="py-2.5 px-3 text-right">
+                            <a href="{{ url_for('logs.traffic_detail', event_id=ev.id) }}" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] border border-slate-700 transition-colors">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="py-8 text-center text-slate-500">
+                            No network events matched the specified search criteria.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if events_pagination.pages > 1 %}
+        <div class="p-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <div>Page {{ events_pagination.page }} of {{ events_pagination.pages }}</div>
+            <div class="flex space-x-1">
+                {% if events_pagination.has_prev %}
+                <a href="{{ url_for('logs.traffic', page=events_pagination.prev_num, q=q, source_ip=source_ip, port=port, protocol=protocol) }}" class="px-2 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">Prev</a>
+                {% endif %}
+                {% if events_pagination.has_next %}
+                <a href="{{ url_for('logs.traffic', page=events_pagination.next_num, q=q, source_ip=source_ip, port=port, protocol=protocol) }}" class="px-2 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">Next</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

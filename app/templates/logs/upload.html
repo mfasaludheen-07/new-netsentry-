@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Telemetry | NetSentry SOC{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+    <div class="bg-soc-surface border border-soc-border p-5 rounded-xl shadow-md">
+        <div class="flex items-center space-x-3 mb-4">
+            <div class="w-10 h-10 rounded-lg bg-cyan-950 border border-cyan-800 text-cyan-400 flex items-center justify-center text-lg">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+            </div>
+            <div>
+                <h1 class="text-base font-bold text-white">Ingest Network Telemetry Stream</h1>
+                <p class="text-xs text-slate-400">Process raw firewall, DNS, Zeek, or NetFlow telemetry through canonical normalization.</p>
+            </div>
+        </div>
+
+        <form method="POST" enctype="multipart/form-data" class="space-y-5">
+            {{ form.hidden_tag() }}
+
+            <!-- File Upload Input Area -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-2">Select Capture File (.csv, .json, .log, .txt)</label>
+                <div class="border-2 border-dashed border-slate-700 hover:border-cyan-500 rounded-xl p-6 text-center bg-slate-900/60 transition-colors">
+                    <i class="fa-solid fa-file-csv text-3xl text-cyan-400 mb-2"></i>
+                    <div class="text-xs text-slate-300 font-medium mb-1">Choose local telemetry file or drag here</div>
+                    <div class="text-[11px] text-slate-500 mb-4">Maximum payload size: 20 MB &bull; Strict validation &bull; SHA-256 hashed</div>
+                    {{ form.log_file(class="text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-cyan-950 file:text-cyan-400 hover:file:bg-cyan-900 cursor-pointer") }}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1.5">Sensor Format / Collector</label>
+                    {{ form.source_type(class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-cyan-500") }}
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1.5">Timestamp Origin Timezone</label>
+                    {{ form.timezone(class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-cyan-500", placeholder="UTC") }}
+                </div>
+            </div>
+
+            <!-- Ingestion Workflow Notice -->
+            <div class="p-3.5 bg-slate-900/80 border border-slate-800 rounded-lg text-xs space-y-1.5 text-slate-400">
+                <div class="font-semibold text-slate-300 flex items-center space-x-1.5 text-[11px] uppercase tracking-wider">
+                    <i class="fa-solid fa-microchip text-cyan-400"></i>
+                    <span>Automated Processing Pipeline</span>
+                </div>
+                <p class="text-[11px] leading-relaxed">
+                    1. Computes cryptographic SHA-256 hash.<br>
+                    2. Parses CSV or JSON structure & validates IP headers.<br>
+                    3. Normalizes timestamp & RFC address classification.<br>
+                    4. Auto-profiles internal endpoints and IOC indicators.<br>
+                    5. Executes defensive detection rules and generates alerts.
+                </p>
+            </div>
+
+            <div class="flex items-center justify-between pt-2">
+                <a href="{{ url_for('logs.index') }}" class="px-3.5 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors">
+                    Cancel
+                </a>
+                <button type="submit" class="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-lg text-xs font-semibold shadow-lg shadow-cyan-600/25 transition-all flex items-center space-x-2">
+                    <i class="fa-solid fa-gear"></i>
+                    <span>Start Telemetry Normalization</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Quick Demo Tip -->
+    <div class="bg-soc-surface border border-slate-800 p-4 rounded-xl flex items-start space-x-3 text-xs text-slate-400">
+        <i class="fa-solid fa-lightbulb text-amber-400 text-base mt-0.5"></i>
+        <div>
+            <div class="font-semibold text-slate-200 mb-0.5">Need sample attack telemetry?</div>
+            <p>You can find pre-packaged attack scenario logs at <span class="font-mono text-cyan-300">demo/demo-network.csv</span> and <span class="font-mono text-cyan-300">demo/demo-network.json</span> in the NetSentry project directory.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

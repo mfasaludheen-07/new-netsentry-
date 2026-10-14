@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Endpoint: {{ endpoint.hostname }} | NetSentry SOC{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-soc-surface border border-soc-border p-4 rounded-xl">
+        <div>
+            <div class="flex items-center space-x-2">
+                <a href="{{ url_for('endpoints.index') }}" class="text-xs text-slate-400 hover:text-cyan-400">&larr; Endpoints Catalog</a>
+                <span class="text-slate-600">&bull;</span>
+                <span class="text-xs font-mono text-cyan-400">{{ endpoint.ip_address }}</span>
+            </div>
+            <h1 class="text-lg font-bold text-white mt-1 flex items-center space-x-2">
+                <i class="fa-solid fa-desktop text-sky-400 text-sm"></i>
+                <span>{{ endpoint.hostname }}</span>
+            </h1>
+            <p class="text-xs text-slate-400 mt-0.5">{{ endpoint.owner_description or 'No ownership metadata recorded.' }}</p>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <span class="px-2.5 py-1 rounded text-xs font-bold uppercase
+                {% if endpoint.criticality == 'CRITICAL' %}bg-rose-950 text-rose-400 border border-rose-800
+                {% elif endpoint.criticality == 'HIGH' %}bg-orange-950 text-orange-400 border border-orange-800
+                {% else %}bg-slate-800 text-slate-300 border border-slate-700{% endif %}">
+                CRITICALITY: {{ endpoint.criticality }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Edit Profile Card -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3">Endpoint Configuration</h3>
+            <form method="POST" action="{{ url_for('endpoints.edit', endpoint_id=endpoint.id) }}" class="space-y-3 text-xs">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Criticality Level</label>
+                    <select name="criticality" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                        <option value="CRITICAL" {% if endpoint.criticality == 'CRITICAL' %}selected{% endif %}>CRITICAL</option>
+                        <option value="HIGH" {% if endpoint.criticality == 'HIGH' %}selected{% endif %}>HIGH</option>
+                        <option value="MEDIUM" {% if endpoint.criticality == 'MEDIUM' %}selected{% endif %}>MEDIUM</option>
+                        <option value="LOW" {% if endpoint.criticality == 'LOW' %}selected{% endif %}>LOW</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Operating System / Role</label>
+                    <input type="text" name="os_info" value="{{ endpoint.os_info }}" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Department / Owner Description</label>
+                    <textarea name="owner_description" rows="2" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">{{ endpoint.owner_description or '' }}</textarea>
+                </div>
+
+                <button type="submit" class="w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-semibold transition-colors">
+                    Save Profile
+                </button>
+            </form>
+        </div>
+
+        <!-- Associated Alerts -->
+        <div class="lg:col-span-2 bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+            <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-3">Threat Alerts Involving This Endpoint ({{ alerts|length }})</h3>
+            <div class="divide-y divide-slate-800 text-xs">
+                {% for a in alerts %}
+                <div class="py-2.5 flex items-center justify-between">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <a href="{{ url_for('alerts.view', alert_id=a.id) }}" class="font-mono text-cyan-400 font-bold hover:underline">
+                                {{ a.id }}
+                            </a>
+                            <span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase {% if a.severity == 'CRITICAL' %}bg-rose-950 text-rose-400{% else %}bg-amber-950 text-amber-400{% endif %}">
+                                {{ a.severity }}
+                            </span>
+                        </div>
+                        <div class="text-slate-300 font-medium mt-0.5">{{ a.title }}</div>
+                    </div>
+                    <a href="{{ url_for('alerts.view', alert_id=a.id) }}" class="px-2.5 py-1 bg-slate-800 text-slate-300 rounded text-xs hover:bg-slate-700">Triage</a>
+                </div>
+                {% else %}
+                <div class="py-4 text-slate-500 text-center">No threat alerts generated for this host.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Network Activity Telemetry -->
+    <div class="bg-soc-surface border border-soc-border rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider">
+            Recent Telemetry Interactions ({{ events|length }})
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="text-[10px] uppercase text-slate-400 bg-slate-900/80 border-b border-slate-800">
+                    <tr>
+                        <th class="py-2.5 px-3">Time</th>
+                        <th class="py-2.5 px-3">Source</th>
+                        <th class="py-2.5 px-3">Destination</th>
+                        <th class="py-2.5 px-3">Port / Protocol</th>
+                        <th class="py-2.5 px-3">Action</th>
+                        <th class="py-2.5 px-3 text-right">Inspect</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% for ev in events %}
+                    <tr class="hover:bg-slate-900/40">
+                        <td class="py-2 px-3 font-mono text-[11px] text-slate-300">{{ ev.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td class="py-2 px-3 font-mono text-cyan-300">{{ ev.source_ip }}</td>
+                        <td class="py-2 px-3 font-mono text-slate-200">{{ ev.destination_ip }}</td>
+                        <td class="py-2 px-3 font-mono text-slate-400">{{ ev.protocol }} {% if ev.destination_port %}:{{ ev.destination_port }}{% endif %}</td>
+                        <td class="py-2 px-3">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {% if ev.action == 'ALLOW' %}bg-emerald-950 text-emerald-400 border border-emerald-800{% else %}bg-rose-950 text-rose-400 border border-rose-800{% endif %}">
+                                {{ ev.action }}
+                            </span>
+                        </td>
+                        <td class="py-2 px-3 text-right">
+                            <a href="{{ url_for('logs.traffic_detail', event_id=ev.id) }}" class="px-2 py-0.5 bg-slate-800 text-slate-300 rounded text-[11px]">Raw</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="py-4 text-center text-slate-500">No events logged for this endpoint yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

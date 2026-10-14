@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}IOC Vault | NetSentry SOC{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-soc-surface border border-soc-border p-4 rounded-xl">
+        <div>
+            <h1 class="text-lg font-bold text-white flex items-center space-x-2">
+                <i class="fa-solid fa-fingerprint text-emerald-400"></i>
+                <span>Indicators of Compromise (IOC Vault)</span>
+            </h1>
+            <p class="text-xs text-slate-400">IP, Domain, Hostname, URL, and Hash indicators observed in network streams.</p>
+        </div>
+        <div>
+            <button onclick="document.getElementById('addIocModal').classList.toggle('hidden')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shadow-md transition-all flex items-center space-x-1.5">
+                <i class="fa-solid fa-plus"></i>
+                <span>Register Manual IOC</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Filter Card -->
+    <div class="bg-soc-surface border border-soc-border p-4 rounded-xl shadow-sm">
+        <form method="GET" action="{{ url_for('iocs.index') }}" class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div class="sm:col-span-2">
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Search Indicators</label>
+                <input type="text" name="q" value="{{ q }}" placeholder="IP, domain, hostname, hash..." class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Indicator Type</label>
+                <select name="type" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200">
+                    <option value="">All Types</option>
+                    <option value="IP" {% if ioc_type == 'IP' %}selected{% endif %}>IP</option>
+                    <option value="DOMAIN" {% if ioc_type == 'DOMAIN' %}selected{% endif %}>DOMAIN</option>
+                    <option value="HOSTNAME" {% if ioc_type == 'HOSTNAME' %}selected{% endif %}>HOSTNAME</option>
+                    <option value="URL" {% if ioc_type == 'URL' %}selected{% endif %}>URL</option>
+                    <option value="HASH_SHA256" {% if ioc_type == 'HASH_SHA256' %}selected{% endif %}>HASH_SHA256</option>
+                </select>
+            </div>
+
+            <div class="flex items-end space-x-2">
+                <div class="flex-1">
+                    <label class="block text-[11px] font-semibold text-slate-400 mb-1">Status</label>
+                    <select name="status" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200">
+                        <option value="">All Statuses</option>
+                        <option value="OBSERVED" {% if status == 'OBSERVED' %}selected{% endif %}>OBSERVED</option>
+                        <option value="SUSPICIOUS" {% if status == 'SUSPICIOUS' %}selected{% endif %}>SUSPICIOUS</option>
+                        <option value="CONFIRMED" {% if status == 'CONFIRMED' %}selected{% endif %}>CONFIRMED</option>
+                        <option value="BENIGN" {% if status == 'BENIGN' %}selected{% endif %}>BENIGN</option>
+                    </select>
+                </div>
+                <button type="submit" class="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-colors">
+                    Filter
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- IOCs Table -->
+    <div class="bg-soc-surface border border-soc-border rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+            <span>Cataloged Indicators ({{ iocs_pagination.total }})</span>
+            <span class="text-slate-500 font-mono text-[11px]">Strict Non-prejudicial Triage</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="text-[10px] uppercase text-slate-400 bg-slate-900/80 border-b border-slate-800">
+                    <tr>
+                        <th class="py-2.5 px-3">Indicator Value</th>
+                        <th class="py-2.5 px-3">Type</th>
+                        <th class="py-2.5 px-3">Status</th>
+                        <th class="py-2.5 px-3">Confidence</th>
+                        <th class="py-2.5 px-3">First Seen</th>
+                        <th class="py-2.5 px-3">Last Seen</th>
+                        <th class="py-2.5 px-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    {% for i in iocs_pagination.items %}
+                    <tr class="hover:bg-slate-900/40">
+                        <td class="py-3 px-3">
+                            <a href="{{ url_for('iocs.view', ioc_id=i.id) }}" class="font-mono text-cyan-300 font-bold hover:underline">
+                                {{ i.value }}
+                            </a>
+                            {% if i.notes %}
+                            <div class="text-[10px] text-slate-400 truncate max-w-sm">{{ i.notes }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-3">
+                            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-300 border border-slate-700">
+                                {{ i.type }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-3">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase
+                                {% if i.status == 'CONFIRMED' %}bg-rose-950 text-rose-400 border border-rose-800
+                                {% elif i.status == 'SUSPICIOUS' %}bg-amber-950 text-amber-400 border border-amber-800
+                                {% elif i.status == 'BENIGN' %}bg-emerald-950 text-emerald-400 border border-emerald-800
+                                {% else %}bg-slate-800 text-slate-400 border border-slate-700{% endif %}">
+                                {{ i.status }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-3 text-slate-300">
+                            {{ i.confidence }}
+                        </td>
+                        <td class="py-3 px-3 font-mono text-[11px] text-slate-400">
+                            {{ i.first_seen.strftime('%Y-%m-%d %H:%M') if i.first_seen else 'N/A' }}
+                        </td>
+                        <td class="py-3 px-3 font-mono text-[11px] text-slate-400">
+                            {{ i.last_seen.strftime('%Y-%m-%d %H:%M') if i.last_seen else 'N/A' }}
+                        </td>
+                        <td class="py-3 px-3 text-right">
+                            <a href="{{ url_for('iocs.view', ioc_id=i.id) }}" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs">
+                                Details
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="py-8 text-center text-slate-500">No indicators found in IOC vault.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if iocs_pagination.pages > 1 %}
+        <div class="p-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <div>Page {{ iocs_pagination.page }} of {{ iocs_pagination.pages }}</div>
+            <div class="flex space-x-1">
+                {% if iocs_pagination.has_prev %}
+                <a href="{{ url_for('iocs.index', page=iocs_pagination.prev_num, q=q, type=ioc_type, status=status) }}" class="px-2 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">Prev</a>
+                {% endif %}
+                {% if iocs_pagination.has_next %}
+                <a href="{{ url_for('iocs.index', page=iocs_pagination.next_num, q=q, type=ioc_type, status=status) }}" class="px-2 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">Next</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal: Add IOC -->
+<div id="addIocModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-soc-surface border border-soc-border max-w-md w-full rounded-xl p-5 shadow-2xl">
+        <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+            <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                <i class="fa-solid fa-fingerprint text-emerald-400"></i>
+                <span>Register Threat Indicator (IOC)</span>
+            </h3>
+            <button onclick="document.getElementById('addIocModal').classList.add('hidden')" class="text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form method="POST" action="{{ url_for('iocs.add') }}" class="space-y-3 text-xs">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Indicator Value *</label>
+                <input type="text" name="value" required placeholder="e.g. 203.0.113.20 or suspicious.example" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Type</label>
+                <select name="type" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200">
+                    <option value="IP">IP Address</option>
+                    <option value="DOMAIN">Domain Name</option>
+                    <option value="HOSTNAME">Internal Hostname</option>
+                    <option value="URL">Full URL</option>
+                    <option value="HASH_SHA256">SHA-256 Hash</option>
+                    <option value="HASH_MD5">MD5 Hash</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">Context / Source Notes</label>
+                <textarea name="notes" rows="2" placeholder="Observed in outbound telemetry stream..." class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200"></textarea>
+            </div>
+
+            <div class="flex items-center justify-end space-x-2 pt-2">
+                <button type="button" onclick="document.getElementById('addIocModal').classList.add('hidden')" class="px-3 py-1.5 text-slate-400 hover:text-white">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold transition-colors">
+                    Save to IOC Vault
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

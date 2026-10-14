@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Detection Rules | NetSentry SOC{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-soc-surface border border-soc-border p-4 rounded-xl">
+        <div>
+            <h1 class="text-lg font-bold text-white flex items-center space-x-2">
+                <i class="fa-solid fa-sliders text-cyan-400"></i>
+                <span>Defensive Detection Rules Engine</span>
+            </h1>
+            <p class="text-xs text-slate-400">Fine-tune detection rule thresholds, time observation windows, severities, and activation toggles.</p>
+        </div>
+    </div>
+
+    <!-- Rules Table -->
+    <div class="bg-soc-surface border border-soc-border rounded-xl overflow-hidden shadow-sm">
+        <div class="p-3 border-b border-slate-800 text-xs font-bold text-slate-300 uppercase tracking-wider">
+            Active Detection Rules ({{ rules|length }})
+        </div>
+        <div class="divide-y divide-slate-800 text-xs">
+            {% for r in rules %}
+            <div class="p-4 hover:bg-slate-900/40">
+                <form method="POST" action="{{ url_for('admin.rules') }}" class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="rule_id" value="{{ r.id }}">
+
+                    <div class="max-w-xl">
+                        <div class="flex items-center space-x-2">
+                            <span class="font-mono text-cyan-400 font-bold">{{ r.id }}</span>
+                            <span class="font-bold text-slate-200 text-sm">{{ r.name }}</span>
+                            {% if r.mitre_technique_id %}
+                            <span class="px-1.5 py-0.2 rounded text-[9px] font-mono bg-purple-950 text-purple-400 border border-purple-800">{{ r.mitre_technique_id }}</span>
+                            {% endif %}
+                        </div>
+                        <p class="text-slate-400 text-[11px] mt-1 leading-relaxed">{{ r.description }}</p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        <div>
+                            <label class="block text-[10px] uppercase text-slate-500 font-semibold mb-0.5">Threshold</label>
+                            <input type="number" name="threshold" value="{{ r.threshold }}" class="w-20 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-xs text-slate-200 font-mono">
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] uppercase text-slate-500 font-semibold mb-0.5">Window (Sec)</label>
+                            <input type="number" name="window" value="{{ r.time_window_seconds }}" class="w-20 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-xs text-slate-200 font-mono">
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] uppercase text-slate-500 font-semibold mb-0.5">Severity</label>
+                            <select name="severity" class="px-2 py-1 bg-slate-900 border border-slate-700 rounded text-xs text-slate-200 font-semibold">
+                                <option value="CRITICAL" {% if r.severity == 'CRITICAL' %}selected{% endif %}>CRITICAL</option>
+                                <option value="HIGH" {% if r.severity == 'HIGH' %}selected{% endif %}>HIGH</option>
+                                <option value="MEDIUM" {% if r.severity == 'MEDIUM' %}selected{% endif %}>MEDIUM</option>
+                                <option value="LOW" {% if r.severity == 'LOW' %}selected{% endif %}>LOW</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] uppercase text-slate-500 font-semibold mb-0.5">State</label>
+                            <select name="enabled" class="px-2 py-1 bg-slate-900 border border-slate-700 rounded text-xs text-slate-200 font-semibold">
+                                <option value="1" {% if r.enabled %}selected{% endif %}>ACTIVE</option>
+                                <option value="0" {% if not r.enabled %}selected{% endif %}>DISABLED</option>
+                            </select>
+                        </div>
+
+                        <div class="self-end pt-3">
+                            <button type="submit" class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-semibold transition-colors">
+                                Update
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
